@@ -18,7 +18,8 @@ export function MediaGrid({ media }: { media: MediaItem[] }) {
           key={item.id}
           to="/posts/$id"
           params={{ id: item.id }}
-          className="group overflow-hidden rounded-lg border border-border bg-surface"
+          preload="intent"
+          className="group cursor-pointer overflow-hidden rounded-lg border border-border bg-surface transition-colors duration-200 hover:border-accent"
           style={{ animationDelay: `${Math.min(index, 7) * 40}ms` }}
         >
           <div className="relative aspect-square bg-surface-2">

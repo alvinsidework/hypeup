@@ -4,13 +4,29 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { InboxView } from "@/components/inbox-view";
 import { PageHeader } from "@/components/page-header";
+import { RefreshOverlay } from "@/components/refresh-overlay";
 import { copy } from "@/lib/hypeup/copy";
 import { getInbox, refreshPosts } from "@/lib/hypeup/api";
 
 export const Route = createFileRoute("/_app/inbox")({
   loader: () => getInbox(),
+  pendingMs: 0,
+  pendingComponent: InboxPending,
   component: InboxPage,
 });
+
+function InboxPending() {
+  return (
+    <div>
+      <PageHeader title="인박스" description="불러오는 중" />
+      <div className="space-y-2">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className="h-16 animate-pulse rounded-lg border border-border bg-surface-2" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function InboxPage() {
   const { comments } = Route.useLoaderData();
@@ -77,6 +93,7 @@ function InboxPage() {
       ) : (
         <InboxView comments={comments} onRefresh={() => void router.invalidate()} />
       )}
+      <RefreshOverlay busy={busy} />
     </div>
   );
 }

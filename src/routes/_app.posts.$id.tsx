@@ -6,8 +6,20 @@ import { getPostDetail } from "@/lib/hypeup/api";
 
 export const Route = createFileRoute("/_app/posts/$id")({
   loader: ({ params }) => getPostDetail({ data: { id: params.id } }),
+  pendingMs: 0,
+  pendingComponent: PostDetailPending,
   component: PostDetailPage,
 });
+
+function PostDetailPending() {
+  return (
+    <div>
+      <div className="h-4 w-20 animate-pulse rounded-sm bg-surface-2" />
+      <div className="mt-4 h-10 w-2/3 animate-pulse rounded-md bg-surface-2" />
+      <div className="mt-6 h-64 animate-pulse rounded-lg bg-surface-2" />
+    </div>
+  );
+}
 
 function PostDetailPage() {
   const { media, comments } = Route.useLoaderData();

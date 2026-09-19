@@ -20,6 +20,7 @@ import { Route as AppInboxRouteImport } from './routes/_app.inbox'
 import { Route as AppLogsRouteImport } from './routes/_app.logs'
 import { Route as AppPostsRouteImport } from './routes/_app.posts'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppPostsIndexRouteImport } from './routes/_app.posts.index'
 import { Route as AppPostsIdRouteImport } from './routes/_app.posts.$id'
 import { Route as ApiAuthInstagramRouteImport } from './routes/api/auth/instagram'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
@@ -81,6 +82,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPostsIndexRoute = AppPostsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppPostsRoute,
+} as any)
 const AppPostsIdRoute = AppPostsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/posts/': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -140,13 +147,13 @@ export interface FileRoutesByTo {
   '/automations': typeof AppAutomationsRoute
   '/inbox': typeof AppInboxRoute
   '/logs': typeof AppLogsRoute
-  '/posts': typeof AppPostsRouteWithChildren
   '/settings': typeof AppSettingsRoute
   '/posts/$id': typeof AppPostsIdRoute
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/posts': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
 }
 export interface FileRoutesById {
@@ -167,6 +174,7 @@ export interface FileRoutesById {
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/_app/posts/': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
 }
 export interface FileRouteTypes {
@@ -187,6 +195,7 @@ export interface FileRouteTypes {
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/webhooks/instagram'
+    | '/posts/'
     | '/api/auth/instagram/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -198,13 +207,13 @@ export interface FileRouteTypes {
     | '/automations'
     | '/inbox'
     | '/logs'
-    | '/posts'
     | '/settings'
     | '/posts/$id'
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/webhooks/instagram'
+    | '/posts'
     | '/api/auth/instagram/callback'
   id:
     | '__root__'
@@ -224,6 +233,7 @@ export interface FileRouteTypes {
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/webhooks/instagram'
+    | '/_app/posts/'
     | '/api/auth/instagram/callback'
   fileRoutesById: FileRoutesById
 }
@@ -319,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/posts/': {
+      id: '/_app/posts/'
+      path: '/'
+      fullPath: '/posts/'
+      preLoaderRoute: typeof AppPostsIndexRouteImport
+      parentRoute: typeof AppPostsRoute
+    }
     '/_app/posts/$id': {
       id: '/_app/posts/$id'
       path: '/$id'
@@ -366,10 +383,12 @@ declare module '@tanstack/react-router' {
 
 interface AppPostsRouteChildren {
   AppPostsIdRoute: typeof AppPostsIdRoute
+  AppPostsIndexRoute: typeof AppPostsIndexRoute
 }
 
 const AppPostsRouteChildren: AppPostsRouteChildren = {
   AppPostsIdRoute: AppPostsIdRoute,
+  AppPostsIndexRoute: AppPostsIndexRoute,
 }
 
 const AppPostsRouteWithChildren = AppPostsRoute._addFileChildren(

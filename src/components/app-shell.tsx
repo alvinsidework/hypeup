@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, Inbox, LayoutGrid, ScrollText, Settings, Wand2 } from "lucide-react";
 import { DemoBanner } from "@/components/demo-banner";
+import { RouteProgress } from "@/components/route-progress";
 import { SiteFooter } from "@/components/site-footer";
 import { LogoMark, Wordmark } from "@/components/logo";
 import { copy } from "@/lib/hypeup/copy";
@@ -67,6 +68,7 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-dvh bg-bg text-fg">
+      <RouteProgress />
       <DemoBanner demoMode={demoMode} />
       <TokenBanner user={user} />
       <div className="mx-auto flex min-h-dvh max-w-[1440px]">

@@ -285,7 +285,6 @@ export async function executeRuleOnComment(user: UserRecord, comment: CommentIte
       mediaId: comment.mediaId,
       message: "매칭된 룰이 없습니다.",
     });
-    await updateCommentFlags(user.id, comment.id, { automationProcessedAt: new Date().toISOString() });
     return { skipped: "no_match" as const };
   }
 

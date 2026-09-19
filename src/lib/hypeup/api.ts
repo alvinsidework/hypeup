@@ -5,6 +5,7 @@ import {
   disconnectUser,
   executeRuleOnComment,
   loadDeskHome,
+  processUnprocessedComments,
   privateReply,
   publicReply,
   removeComment,
@@ -172,6 +173,9 @@ export const saveRuleFn = createServerFn({ method: "POST" })
   .validator(ruleSchema)
   .handler(async ({ data }) => {
     const user = await safeUser();
+    if (data.matchMode !== "ANY" && data.keywords.length === 0) {
+      throw new Error("키워드를 입력하세요.");
+    }
     const saved = await saveRule(user.id, {
       name: data.name,
       enabled: data.enabled,
@@ -186,6 +190,7 @@ export const saveRuleFn = createServerFn({ method: "POST" })
       id: data.id,
       sortOrder: data.sortOrder ?? 0,
     });
+    await processUnprocessedComments(user);
     return { rule: saved };
   });
 

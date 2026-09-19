@@ -17,53 +17,11 @@ const EMPTY: RuleDraft = {
   hideComment: false,
 };
 
-function ChipInput({
-  label,
-  values,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  values: string[];
-  onChange: (next: string[]) => void;
-  placeholder: string;
-}) {
-  const [draft, setDraft] = useState("");
-  function add() {
-    const value = draft.trim();
-    if (!value || values.includes(value)) return;
-    onChange([...values, value]);
-    setDraft("");
-  }
-  return (
-    <label className="block space-y-2">
-      <span className="text-[12px] text-muted">{label}</span>
-      <div className="flex flex-wrap gap-1.5">
-        {values.map((value) => (
-          <button
-            key={value}
-            type="button"
-            className="rounded-sm border border-border px-2 py-1 text-[12px]"
-            onClick={() => onChange(values.filter((item) => item !== value))}
-          >
-            {value} ×
-          </button>
-        ))}
-      </div>
-      <input
-        value={draft}
-        placeholder={placeholder}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            add();
-          }
-        }}
-        className="h-11 w-full rounded-md border border-border bg-bg px-3 text-[13px] outline-none focus-visible:border-accent"
-      />
-    </label>
-  );
+function splitKeywords(value: string): string[] {
+  return value
+    .split(/[,，\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 export function RuleForm({
@@ -78,16 +36,28 @@ export function RuleForm({
   onSave: (draft: RuleDraft) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<RuleDraft>(initial ?? EMPTY);
+  const [keywordText, setKeywordText] = useState((initial?.keywords ?? []).join(", "));
+  const [excludeText, setExcludeText] = useState((initial?.excludeKeywords ?? []).join(", "));
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <form
       className="space-y-5"
       onSubmit={(event) => {
         event.preventDefault();
+        const keywords = splitKeywords(keywordText);
+        const excludeKeywords = splitKeywords(excludeText);
+        if (draft.matchMode !== "ANY" && keywords.length === 0) {
+          setError("키워드를 쉼표로 구분해 입력하세요. 예: 가격, 얼마");
+          return;
+        }
+        setError(null);
         setBusy(true);
         void onSave({
           ...draft,
+          keywords,
+          excludeKeywords,
           publicReplies: draft.publicReplies.map((item) => item.trim()).filter(Boolean),
           dmMessage: draft.dmMessage?.trim() ? draft.dmMessage.trim() : null,
         }).finally(() => setBusy(false));
@@ -140,20 +110,27 @@ export function RuleForm({
       </label>
 
       {draft.matchMode !== "ANY" ? (
-        <ChipInput
-          label="키워드"
-          values={draft.keywords}
-          onChange={(keywords) => setDraft({ ...draft, keywords })}
-          placeholder="Enter로 추가"
-        />
+        <label className="block space-y-2">
+          <span className="text-[12px] text-muted">키워드 (쉼표로 구분)</span>
+          <input
+            value={keywordText}
+            onChange={(event) => setKeywordText(event.target.value)}
+            placeholder="예: 가격, 얼마, 링크"
+            className="h-11 w-full rounded-md border border-border bg-bg px-3 text-[13px]"
+          />
+        </label>
       ) : null}
 
-      <ChipInput
-        label="제외 키워드"
-        values={draft.excludeKeywords}
-        onChange={(excludeKeywords) => setDraft({ ...draft, excludeKeywords })}
-        placeholder="Enter로 추가"
-      />
+      <label className="block space-y-2">
+        <span className="text-[12px] text-muted">제외 키워드 (쉼표로 구분)</span>
+        <input
+          value={excludeText}
+          onChange={(event) => setExcludeText(event.target.value)}
+          placeholder="예: 팔로워, 홍보"
+          className="h-11 w-full rounded-md border border-border bg-bg px-3 text-[13px]"
+        />
+      </label>
+      {error ? <p className="text-[13px] text-danger">{error}</p> : null}
 
       <div className="space-y-2">
         <p className="text-[12px] text-muted">공개 대댓글 (줄마다 하나, 랜덤 발송)</p>

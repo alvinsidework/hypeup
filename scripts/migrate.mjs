@@ -51,10 +51,13 @@ async function main() {
   }
 
   const isSupabase = /supabase\.(co|com)/i.test(databaseUrl);
+  const connectionString = databaseUrl
+    .replace(/[?&]sslmode=[^&]*/g, "")
+    .replace(/[?&]uselibpqcompat=[^&]*/g, "");
   const pool = new pg.Pool({
-    connectionString: databaseUrl,
+    connectionString,
     max: 1,
-    ssl: isSupabase ? { rejectUnauthorized: true } : undefined,
+    ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
   });
   const client = await pool.connect();
   try {

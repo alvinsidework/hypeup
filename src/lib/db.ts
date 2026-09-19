@@ -96,10 +96,13 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
     const isSupabase = /supabase\.(co|com)/i.test(databaseUrl ?? "");
+    const connectionString = (databaseUrl ?? "")
+      .replace(/[?&]sslmode=[^&]*/g, "")
+      .replace(/[?&]uselibpqcompat=[^&]*/g, "");
     const pool = new Pool({
-      connectionString: databaseUrl,
+      connectionString,
       max: 5,
-      ssl: isSupabase ? { rejectUnauthorized: true } : undefined,
+      ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
     });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);

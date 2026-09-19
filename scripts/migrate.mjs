@@ -18,7 +18,15 @@ import { dirname, join } from "node:path";
 import pg from "pg";
 import { pendingMigrations } from "./migration-plan.mjs";
 
-const databaseUrl = process.env.DATABASE_URL;
+function resolveDatabaseUrl() {
+  for (const key of ["DATABASE_URL", "SUPABASE_DB_URL", "POSTGRES_URL", "POSTGRES_PRISMA_URL"]) {
+    const value = process.env[key]?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+const databaseUrl = resolveDatabaseUrl();
 if (!databaseUrl) {
   console.log(
     "[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).",
@@ -42,7 +50,12 @@ async function main() {
     return;
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
+  const isSupabase = /supabase\.(co|com)/i.test(databaseUrl);
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    max: 1,
+    ssl: isSupabase ? { rejectUnauthorized: true } : undefined,
+  });
   const client = await pool.connect();
   try {
     await client.query(

@@ -1,0 +1,62 @@
+export const copy = {
+  appName: "Hypeup",
+  tagline: "내 인스타그램 댓글을 운영 데스크로",
+  landingBody:
+    "프로페셔널 계정으로 연결하면 게시물 댓글을 읽고, 키워드에 맞춰 공개 대댓글과 DM을 보냅니다. 비밀번호는 Instagram이 받습니다.",
+  connectHeadline: "내 인스타그램으로 운영 데스크 연결",
+  connectBody:
+    "Business Login으로 본인 프로페셔널 계정만 연결합니다. Hypeup은 비밀번호를 받지 않습니다.",
+  professionalHint:
+    "개인 계정은 API 대상이 아닙니다. Instagram 설정에서 비즈니스 또는 크리에이터로 전환하세요.",
+  continueWithInstagram: "Instagram으로 계속",
+  browseDemo: "데모 둘러보기",
+  demoBanner: "DEMO — Instagram 미연결",
+  demoHint: "Instagram App ID가 없어 데모 데이터로 화면을 보여줍니다.",
+  notConfigured:
+    "Instagram 앱 키가 없습니다. README의 Meta 앱 설정을 끝낸 뒤 환경 변수를 채우세요.",
+  emptyComments: "아직 댓글이 없습니다",
+  emptyPosts: "아직 게시물이 없습니다. Instagram에서 새로고침하세요.",
+  emptyRules: "첫 자동화 만들기 — 예: ‘가격’ 댓글에 견적 DM",
+  emptyLogs: "아직 기록이 없습니다",
+  replyPublic: "대댓글 보내기",
+  sendDm: "DM 보내기",
+  hide: "숨김",
+  unhide: "숨김 해제",
+  delete: "삭제",
+  runRule: "이 댓글에 룰 실행",
+  refreshFromIg: "Instagram에서 새로고침",
+  tokenExpiring: "토큰이 곧 만료됩니다. 다시 연결하세요.",
+  tokenExpired: "연결이 만료되었습니다. 다시 연결하세요.",
+  webhookOff: "실시간 자동화가 꺼져 있습니다. 설정에서 다시 구독하세요.",
+  disconnect: "연결 해제",
+  resubscribe: "다시 구독",
+  personalAccount:
+    "프로페셔널 계정만 연결할 수 있습니다. Instagram 설정에서 비즈니스 또는 크리에이터로 전환하세요.",
+  notTester: "Meta 앱 역할에 이 계정을 테스터로 추가해야 합니다.",
+  redirectMismatch: "Instagram 앱의 OAuth redirect URI가 이 주소와 정확히 같아야 합니다.",
+  dmDuplicate: "이 댓글에는 이미 DM을 보냈습니다. (댓글당 1통)",
+  dmExpired: "댓글 후 7일이 지나 DM을 보낼 수 없습니다.",
+  rateLimited: "Instagram 요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
+  denied: "Instagram에서 권한 요청을 취소했거나, 앱이 요청한 권한을 받을 수 없습니다.",
+  missingKeys: "APP_ENCRYPTION_KEY와 AUTH_SECRET을 .env.local에 64자리 hex로 채운 뒤 앱을 다시 시작하세요.",
+  genericError: "요청을 처리하지 못했습니다. 잠시 후 다시 시도하세요.",
+  nav: {
+    overview: "오버뷰",
+    posts: "게시물",
+    inbox: "인박스",
+    automations: "자동화",
+    logs: "로그",
+    settings: "설정",
+  },
+} as const;
+
+export const oauthErrorCopy: Record<string, string> = {
+  personal_account: copy.personalAccount,
+  not_tester: copy.notTester,
+  redirect_mismatch: copy.redirectMismatch,
+  not_configured: copy.notConfigured,
+  denied: copy.denied,
+  missing_keys: copy.missingKeys,
+  token_expired: copy.tokenExpired,
+  state: "로그인 검증에 실패했습니다. 다시 연결하세요.",
+};

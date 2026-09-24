@@ -1,9 +1,9 @@
 export const copy = {
   appName: "Hypeup",
-  tagline: "내 인스타그램 댓글을 손쉽게 자동화하기",
+  tagline: "인스타그램 댓글과 DM, 손쉽게 자동화하기",
   landingBody:
     "프로페셔널 계정으로 연결하면 설정한 키워드에 맞춰 공개 대댓글과 DM을 보냅니다.",
-  connectHeadline: "내 인스타그램으로 운영 데스크 연결",
+  connectHeadline: "내 인스타그램으로 대시보드 연결",
   connectBody:
     "Business Login으로 본인 프로페셔널 계정만 연결합니다. Hypeup은 비밀번호를 받지 않습니다.",
   professionalHint:

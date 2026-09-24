@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { AccessRequestDialog } from "@/components/access-request-dialog";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -45,7 +45,7 @@ function Landing({ demoMode }: { demoMode: boolean }) {
         <LogoMark className="size-7" />
         <Wordmark />
       </header>
-      <main className="mx-auto grid max-w-[1200px] gap-12 px-4 py-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:py-20">
+      <main className="mx-auto grid max-w-[1200px] items-center gap-12 px-4 py-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:py-20">
         <section>
           <p className="text-[12px] uppercase tracking-[0.16em] text-accent">Comment desk</p>
           <h1 className="mt-4 max-w-xl font-display text-4xl leading-[1.1] tracking-tight sm:text-6xl">
@@ -84,26 +84,15 @@ function Landing({ demoMode }: { demoMode: boolean }) {
           <p className="mt-4 max-w-lg text-[13px] leading-6 text-muted">{copy.applyHint}</p>
           <AccessRequestDialog open={applyOpen} onOpenChange={setApplyOpen} />
         </section>
-        <section className="rounded-xl border border-border bg-surface p-6">
-          <p className="text-[12px] uppercase tracking-[0.14em] text-subtle">지금 할 일</p>
-          <ol className="mt-4 space-y-4 text-[14px] leading-6 text-muted">
-            <li>
-              <span className="font-medium text-fg">1. 프로페셔널 계정</span>
-              <span className="block">Instagram을 비즈니스 또는 크리에이터로 전환</span>
-            </li>
-            <li>
-              <span className="font-medium text-fg">2. Meta 앱</span>
-              <span className="block">developers.facebook.com에서 Business 앱 + Instagram Login</span>
-            </li>
-            <li>
-              <span className="font-medium text-fg">3. 키 입력</span>
-              <span className="block">App ID / Secret을 환경 변수에 넣고 다시 연결</span>
-            </li>
-          </ol>
-          <Link to="/connect" search={{ error: undefined, detail: undefined }} className="mt-6 inline-flex text-[13px] text-accent">
-            설정 체크리스트 보기
-          </Link>
-        </section>
+        <figure className="mx-auto w-full max-w-[400px] lg:mx-0 lg:ml-auto">
+          <img
+            src="/ig.jpeg"
+            alt="Instagram"
+            width={447}
+            height={447}
+            className="aspect-square w-full rounded-[22%] object-cover shadow-[0_28px_70px_-18px_rgba(225,48,108,0.55)]"
+          />
+        </figure>
       </main>
       <SiteFooter />
     </div>

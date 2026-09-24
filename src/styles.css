@@ -12,13 +12,21 @@
   --color-accent-fg: #0b0b0c;
   --color-danger: #c45c4a;
   --color-ok: #7d9b7a;
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-display: "Paperlogy", "IBM Plex Sans KR", sans-serif;
   --font-sans: "IBM Plex Sans KR", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
   --radius-xl: 28px;
+}
+
+@font-face {
+  font-family: "Paperlogy";
+  src: url("/fonts/paperlogy/Paperlogy-4Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
 }
 
 @layer base {
@@ -43,6 +51,10 @@
     cursor: pointer;
   }
 
+  .font-display {
+    font-synthesis: none;
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
@@ -51,19 +63,6 @@
   ::selection {
     background: color-mix(in oklab, var(--color-accent) 40%, transparent);
     color: var(--color-fg);
-  }
-}
-
-.hypeup-progress {
-  animation: hypeup-indeterminate 1.1s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-}
-
-@keyframes hypeup-indeterminate {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(420%);
   }
 }
 

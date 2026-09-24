@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
+import { AccessRequestDialog } from "@/components/access-request-dialog";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { LogoMark, Wordmark } from "@/components/logo";
@@ -31,6 +33,7 @@ function Home() {
 
 function Landing({ demoMode }: { demoMode: boolean }) {
   const router = useRouter();
+  const [applyOpen, setApplyOpen] = useState(false);
   return (
     <div className="min-h-dvh bg-bg text-fg">
       {demoMode ? (
@@ -50,36 +53,36 @@ function Landing({ demoMode }: { demoMode: boolean }) {
           </h1>
           <p className="mt-5 max-w-lg text-[15px] leading-7 text-muted">{copy.landingBody}</p>
           <div className="mt-8 flex flex-wrap gap-3">
+            <button
+              type="button"
+              className="inline-flex h-11 items-center rounded-md bg-fg px-4 text-[13px] font-medium text-bg"
+              onClick={() => setApplyOpen(true)}
+            >
+              {copy.applyForAccess}
+            </button>
             {demoMode ? (
-              <>
-                <button
-                  type="button"
-                  className="inline-flex h-11 items-center rounded-md bg-fg px-4 text-[13px] font-medium text-bg"
-                  onClick={async () => {
-                    await enterDemo();
-                    await router.invalidate();
-                    await router.navigate({ to: "/" });
-                  }}
-                >
-                  {copy.browseDemo}
-                </button>
-                <Link
-                  to="/connect"
-                  search={{ error: undefined, detail: undefined }}
-                  className="inline-flex h-11 items-center rounded-md border border-border px-4 text-[13px]"
-                >
-                  연결 준비
-                </Link>
-              </>
+              <button
+                type="button"
+                className="inline-flex h-11 items-center rounded-md border border-border px-4 text-[13px]"
+                onClick={async () => {
+                  await enterDemo();
+                  await router.invalidate();
+                  await router.navigate({ to: "/" });
+                }}
+              >
+                {copy.browseDemo}
+              </button>
             ) : (
               <a
                 href="/api/auth/instagram"
-                className="inline-flex h-11 items-center rounded-md bg-fg px-4 text-[13px] font-medium text-bg"
+                className="inline-flex h-11 items-center rounded-md border border-border px-4 text-[13px]"
               >
-                {copy.continueWithInstagram}
+                {copy.alreadyTester}
               </a>
             )}
           </div>
+          <p className="mt-4 max-w-lg text-[13px] leading-6 text-muted">{copy.applyHint}</p>
+          <AccessRequestDialog open={applyOpen} onOpenChange={setApplyOpen} />
         </section>
         <section className="rounded-xl border border-border bg-surface p-6">
           <p className="text-[12px] uppercase tracking-[0.14em] text-subtle">지금 할 일</p>

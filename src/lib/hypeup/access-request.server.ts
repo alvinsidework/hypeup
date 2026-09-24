@@ -4,6 +4,7 @@ import {
   composeAccessRequestEmail,
   isEmailAddress,
   normalizeInstagramHandle,
+  type AccessRequestRelay,
 } from "./access-request-mail";
 import { appUrl, instagramAppId } from "./env.server";
 import { legal } from "./legal";
@@ -18,7 +19,9 @@ export type AccessRequestInput = {
   companyWebsite?: string;
 };
 
-export type AccessRequestResult = { ok: true } | { ok: false; error: string };
+export type AccessRequestResult =
+  | { ok: true; relay: AccessRequestRelay | null }
+  | { ok: false; error: string };
 
 const hourMs = 60 * 60 * 1000;
 const byEmail = new Map<string, number[]>();
@@ -36,10 +39,6 @@ function tooMany(email: string): boolean {
   globalStamps.push(now);
   byEmail.set(email, stamps);
   return false;
-}
-
-function activationPending(message: string | undefined): boolean {
-  return /activat/i.test(message ?? "");
 }
 
 async function sendViaResend(input: {
@@ -69,48 +68,17 @@ async function sendViaResend(input: {
   }
 }
 
-async function sendViaFormSubmit(
-  input: {
-    subject: string;
-    text: string;
-    replyTo: string;
-    instagram: string;
-  },
-  site: string,
-): Promise<void> {
-  const response = await fetch(
-    `https://formsubmit.co/ajax/${encodeURIComponent(ACCESS_REQUEST_INBOX)}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Origin: site,
-        Referer: `${site}/`,
-      },
-      body: JSON.stringify({
-        _subject: input.subject,
-        _template: "box",
-        _captcha: "false",
-        _replyto: input.replyTo,
-        email: input.replyTo,
-        instagram: `@${input.instagram}`,
-        message: input.text,
-      }),
-      signal: AbortSignal.timeout(12_000),
-    },
-  );
-  const payload = (await response.json().catch(() => null)) as {
-    success?: string | boolean;
-    message?: string;
-  } | null;
-  const success = payload?.success === true || payload?.success === "true";
-  if (success || activationPending(payload?.message)) return;
-  throw new Error(payload?.message || `formsubmit ${response.status}`);
+function relayFor(mail: {
+  subject: string;
+  text: string;
+  replyTo: string;
+  instagram: string;
+}): AccessRequestRelay {
+  return { to: ACCESS_REQUEST_INBOX, ...mail };
 }
 
 export async function deliverAccessRequest(input: AccessRequestInput): Promise<AccessRequestResult> {
-  if (input.companyWebsite?.trim()) return { ok: true };
+  if (input.companyWebsite?.trim()) return { ok: true, relay: null };
   if (!input.consent) return { ok: false, error: "이용 동의에 체크해 주세요." };
 
   const instagram = normalizeInstagramHandle(input.instagram);
@@ -134,23 +102,14 @@ export async function deliverAccessRequest(input: AccessRequestInput): Promise<A
     appId: instagramAppId(),
   });
 
+  const resendKey = env("RESEND_API_KEY");
+  if (!resendKey) return { ok: true, relay: relayFor(mail) };
+
   try {
-    const resendKey = env("RESEND_API_KEY");
-    if (resendKey) {
-      await sendViaResend({ ...mail, apiKey: resendKey });
-    } else {
-      await sendViaFormSubmit(mail, site);
-    }
-    return { ok: true };
+    await sendViaResend({ ...mail, apiKey: resendKey });
+    return { ok: true, relay: null };
   } catch (error) {
     console.error("[hypeup] access request mail failed", error instanceof Error ? error.message : "error");
-    byEmail.set(
-      email.toLowerCase(),
-      (byEmail.get(email.toLowerCase()) ?? []).slice(0, -1),
-    );
-    return {
-      ok: false,
-      error: "신청을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    };
+    return { ok: true, relay: relayFor(mail) };
   }
 }

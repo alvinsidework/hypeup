@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { submitAccessRequest } from "@/lib/hypeup/access-request";
+import { postAccessRequest } from "@/lib/hypeup/access-request-mail";
 
 export function AccessRequestDialog({
   open,
@@ -62,12 +63,16 @@ export function AccessRequestDialog({
                 void submitAccessRequest({
                   data: { instagram, email, consent, companyWebsite },
                 })
-                  .then((result) => {
-                    if (result.ok) {
-                      setSent(true);
+                  .then(async (result) => {
+                    if (!result.ok) {
+                      setError(result.error);
                       return;
                     }
-                    setError(result.error);
+                    if (result.relay && !(await postAccessRequest(result.relay))) {
+                      setError("신청을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.");
+                      return;
+                    }
+                    setSent(true);
                   })
                   .catch(() => setError("신청을 보내지 못했습니다. 잠시 후 다시 시도해 주세요."))
                   .finally(() => setBusy(false));

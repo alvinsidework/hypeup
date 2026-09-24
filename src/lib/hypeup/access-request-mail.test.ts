@@ -4,6 +4,7 @@ import {
   TESTER_ACCEPT_URL,
   applicantSiteUrl,
   composeAccessRequestEmail,
+  formSubmitAccepted,
   normalizeInstagramHandle,
   replyBody,
 } from "./access-request-mail.ts";
@@ -30,6 +31,16 @@ test("reply block contains the tester accept link and not the admin dashboard", 
   assert.doesNotMatch(reply, /developers\.facebook\.com/);
   assert.match(mail.text, /https:\/\/developers\.facebook\.com\/apps\/123456\/roles\/roles\//);
   assert.match(mail.text, /guest@example.com/);
+});
+
+test("treats form activation as an accepted delivery", () => {
+  assert.equal(formSubmitAccepted({ success: "true" }), true);
+  assert.equal(
+    formSubmitAccepted({ success: "false", message: "This form needs Activation." }),
+    true,
+  );
+  assert.equal(formSubmitAccepted({ success: "false", message: "Make sure you open this page through a web server" }), false);
+  assert.equal(formSubmitAccepted(null), false);
 });
 
 test("applicant link ignores localhost", () => {

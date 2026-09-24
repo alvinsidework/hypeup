@@ -11,6 +11,39 @@ export type AccessRequestMail = {
   instagram: string;
 };
 
+export type AccessRequestRelay = AccessRequestMail & { to: string };
+
+export function formSubmitAccepted(payload: { success?: string | boolean; message?: string } | null): boolean {
+  if (!payload) return false;
+  if (payload.success === true || payload.success === "true") return true;
+  return /activat/i.test(payload.message ?? "");
+}
+
+export async function postAccessRequest(relay: AccessRequestRelay): Promise<boolean> {
+  const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(relay.to)}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      _subject: relay.subject,
+      _template: "box",
+      _captcha: "false",
+      _replyto: relay.replyTo,
+      email: relay.replyTo,
+      instagram: `@${relay.instagram}`,
+      message: relay.text,
+    }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  const payload = (await response.json().catch(() => null)) as {
+    success?: string | boolean;
+    message?: string;
+  } | null;
+  return formSubmitAccepted(payload);
+}
+
 export function normalizeInstagramHandle(raw: string): string | null {
   const handle = raw.trim().replace(/^@+/, "").toLowerCase();
   if (!/^[a-z0-9._]{1,30}$/.test(handle)) return null;

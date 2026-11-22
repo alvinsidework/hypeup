@@ -22,7 +22,8 @@ export function authorizeUrl(input: {
   redirectUri: string;
   state: string;
 }): string {
-  const url = new URL("https://www.instagram.com/oauth/authorize");
+  // Instagram excludes /oauth/authorize/* and #weblink from iOS app links.
+  const url = new URL("https://www.instagram.com/oauth/authorize/#weblink");
   url.searchParams.set("client_id", input.appId);
   url.searchParams.set("redirect_uri", input.redirectUri);
   url.searchParams.set("response_type", "code");

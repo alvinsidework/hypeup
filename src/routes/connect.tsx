@@ -52,9 +52,9 @@ function ConnectPage() {
                 <p className="[word-break:keep-all]">{errorText}</p>
                 {checkInvite ? (
                   <p className="mt-1 text-muted [word-break:keep-all]">
-                    Instagram 웹사이트 권한의 테스터 탭에서 초대 수락 여부를
-                    확인해 주세요. 초대가 보이지 않으면 초대받은 계정으로
-                    로그인했는지 확인해 주세요.
+                    테스터 초대를 수락했다면 아래 2번에서 같은 계정으로 다시
+                    연결해 주세요. 초대가 보이지 않으면 Instagram 웹에서
+                    초대받은 계정으로 로그인했는지 확인해 주세요.
                   </p>
                 ) : null}
                 {detail ? (
@@ -107,9 +107,8 @@ function ConnectPage() {
                 Lens에 Instagram 계정 연결
               </h2>
               <p className="mt-2.5 text-sm leading-6 text-muted [word-break:keep-all]">
-                초대를 수락한 뒤 이 화면으로 돌아와 같은 계정으로 연결하세요.
-                이미 수락했다면 바로 연결하고 Instagram 권한 화면에서 허용을
-                눌러 주세요.
+                초대를 수락한 계정으로 Instagram 웹 권한 화면에서 허용을 눌러
+                주세요. 권한을 허용하면 Lens로 돌아옵니다.
               </p>
               {boot.demoMode ? (
                 <button

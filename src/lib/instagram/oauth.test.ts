@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   isAuthorizationCodeUsed,
@@ -40,7 +40,7 @@ test("recognizes already-used authorization codes separately from other authoriz
   assert.equal(isAuthorizationCodeUsed("This authorization code has been used"), false);
 });
 
-test("the token exchange sends an authorization code once when Instagram rate limits it", async (context) => {
+async function loadOAuth(context: TestContext): Promise<typeof import("./oauth")> {
   const { createServer } = await import("vite");
   const server = await createServer({
     configFile: false,
@@ -49,9 +49,23 @@ test("the token exchange sends an authorization code once when Instagram rate li
     server: { middlewareMode: true, ws: false, watch: null },
   });
   context.after(() => server.close());
-  const { exchangeShortLivedToken } = (await server.ssrLoadModule(
-    "/src/lib/instagram/oauth.ts",
-  )) as typeof import("./oauth");
+  return (await server.ssrLoadModule("/src/lib/instagram/oauth.ts")) as typeof import("./oauth");
+}
+
+test("the authorization URL stays on the web and preserves the Lens callback", async (context) => {
+  const { authorizeUrl } = await loadOAuth(context);
+  const redirectUri = "https://example.test/api/auth/instagram/callback";
+  const url = new URL(authorizeUrl({ appId: "test-app", redirectUri, state: "test-state" }));
+  assert.equal(url.origin, "https://www.instagram.com");
+  assert.equal(url.pathname, "/oauth/authorize/");
+  assert.equal(url.hash, "#weblink");
+  assert.equal(url.searchParams.get("redirect_uri"), redirectUri);
+  assert.equal(url.searchParams.get("state"), "test-state");
+  assert.equal(url.searchParams.get("response_type"), "code");
+});
+
+test("the token exchange sends an authorization code once when Instagram rate limits it", async (context) => {
+  const { exchangeShortLivedToken } = await loadOAuth(context);
 
   const request = context.mock.method(globalThis, "fetch", async () =>
     Response.json({ error_message: "Rate limited" }, { status: 429 }),

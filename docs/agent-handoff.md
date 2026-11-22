@@ -40,7 +40,7 @@
 - Instagram App ID `1076634118483518`, 표시 이름 `hypeup-IG`
 - OAuth `client_id` 는 Instagram App ID다. Facebook App ID를 authorize URL에 넣지 않는다.
 - 스코프: `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages`
-- 인가 URL: `https://www.instagram.com/oauth/authorize`, `enable_fb_login=0`
+- 인가 URL: `https://www.instagram.com/oauth/authorize/#weblink`, `enable_fb_login=0`. 경로 끝 슬래시와 `#weblink` 는 인스타그램 앱 전환을 피하기 위한 것으로, Lens 콜백 주소에는 추가하지 않는다.
 - 짧은 토큰: POST `https://api.instagram.com/oauth/access_token`
 - 긴 토큰: GET `https://graph.instagram.com/access_token?grant_type=ig_exchange_token`. POST는 지원되지 않아 `Object with ID 'access_token'` 오류가 난다. 그 문장에 permissions가 있어도 테스터 미등록으로 보여주지 않는다. 거절되면 1시간 토큰으로 `/me` 를 계속한다.
 - 앱 그래프 버전은 `IG_GRAPH_VERSION=v21.0` 이다. 대시보드 호출 예시는 v26일 수 있다. 버전 때문에 위 POST 오류가 난 것은 아니다.

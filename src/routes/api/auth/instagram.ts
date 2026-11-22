@@ -4,6 +4,7 @@ import {
   instagramAppId,
   isDemoMode,
   oauthRedirectUri,
+  OAUTH_CLIENT_COOKIE,
   OAUTH_STATE_COOKIE,
 } from "@/lib/hypeup/env.server";
 import { cookieHeader } from "@/lib/hypeup/session.server";
@@ -24,6 +25,9 @@ export const Route = createFileRoute("/api/auth/instagram")({
         });
         const headers = new Headers({ Location: location });
         headers.append("set-cookie", cookieHeader(OAUTH_STATE_COOKIE, state, request, 600));
+        if (new URL(request.url).searchParams.get("client") === "app") {
+          headers.append("set-cookie", cookieHeader(OAUTH_CLIENT_COOKIE, "app", request, 600));
+        }
         return new Response(null, { status: 302, headers });
       },
     },

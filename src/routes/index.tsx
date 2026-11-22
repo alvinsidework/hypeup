@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { AccessRequestDialog } from "@/components/access-request-dialog";
+import { InstagramConnectLink } from "@/components/instagram-connect-link";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { LogoMark, Wordmark } from "@/components/logo";
@@ -73,12 +74,9 @@ function Landing({ demoMode }: { demoMode: boolean }) {
                 {copy.browseDemo}
               </button>
             ) : (
-              <a
-                href="/api/auth/instagram"
-                className="inline-flex h-11 items-center rounded-md border border-border px-4 text-[13px]"
-              >
+              <InstagramConnectLink className="inline-flex h-11 items-center rounded-md border border-border px-4 text-[13px]">
                 {copy.alreadyTester}
-              </a>
+              </InstagramConnectLink>
             )}
           </div>
           <p className="mt-4 max-w-lg text-[13px] leading-6 text-muted">{copy.applyHint}</p>

@@ -4,6 +4,7 @@ export const DEMO_USER_ID = "demo-user";
 export const DEMO_IG_USER_ID = "demo-ig";
 export const SESSION_COOKIE = "hypeup_session";
 export const OAUTH_STATE_COOKIE = "hypeup_oauth_state";
+export const OAUTH_CLIENT_COOKIE = "hypeup_oauth_client";
 export const DEFAULT_GRAPH_VERSION = "v21.0";
 
 function requiredWhenLive(key: string, value: string | undefined): string {

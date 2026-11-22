@@ -1,5 +1,6 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { DemoBanner } from "@/components/demo-banner";
+import { InstagramConnectLink } from "@/components/instagram-connect-link";
 import { LogoMark, Wordmark } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
 import { enterDemo, getBootstrap } from "@/lib/hypeup/bootstrap";
@@ -92,12 +93,9 @@ function ConnectPage() {
               </button>
             </>
           ) : (
-            <a
-              href="/api/auth/instagram"
-              className="inline-flex h-11 items-center rounded-md bg-fg px-4 text-[13px] font-medium text-bg"
-            >
+            <InstagramConnectLink className="inline-flex h-11 items-center rounded-md bg-fg px-4 text-[13px] font-medium text-bg">
               {copy.continueWithInstagram}
-            </a>
+            </InstagramConnectLink>
           )}
         </div>
 

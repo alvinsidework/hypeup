@@ -5,10 +5,12 @@ import {
   instagramAppSecret,
   isDemoMode,
   oauthRedirectUri,
+  OAUTH_CLIENT_COOKIE,
   OAUTH_STATE_COOKIE,
   SESSION_COOKIE,
 } from "@/lib/hypeup/env.server";
 import { addLog, upsertUser } from "@/lib/hypeup/repo";
+import { appBridgeResponse, signAppHandoff } from "@/lib/hypeup/app-handoff";
 import { cookieHeader, readCookieHeader, signSession } from "@/lib/hypeup/session.server";
 import {
   exchangeLongLivedToken,
@@ -28,6 +30,9 @@ function redirectTo(request: Request, path: string, extraCookies: string[] = [])
 }
 
 function connectError(request: Request, code: string, detail?: string, extraCookies: string[] = []) {
+  if (readCookieHeader(request, OAUTH_CLIENT_COOKIE) === "app") {
+    return appBridgeResponse(request, { error: code, detail }, extraCookies);
+  }
   const target = new URL("/connect", request.url);
   target.searchParams.set("error", code);
   if (detail) target.searchParams.set("detail", detail.slice(0, 180));
@@ -121,6 +126,9 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
             });
           }
           const session = await signSession({ userId: user.id, igUserId: user.igUserId });
+          if (readCookieHeader(request, OAUTH_CLIENT_COOKIE) === "app") {
+            return appBridgeResponse(request, { handoff: await signAppHandoff(session) }, [clearState]);
+          }
           return redirectTo(request, "/", [
             clearState,
             cookieHeader(SESSION_COOKIE, session, request, 60 * 60 * 24 * 30),

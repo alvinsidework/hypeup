@@ -36,6 +36,7 @@ import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiCronRefreshTokensRouteImport } from './routes/api/cron/refresh-tokens'
 import { Route as ApiWebhooksInstagramRouteImport } from './routes/api/webhooks/instagram'
 import { Route as ApiAuthInstagramCallbackRouteImport } from './routes/api/auth/instagram.callback'
+import { Route as ApiAuthInstagramHandoffRouteImport } from './routes/api/auth/instagram.handoff'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -172,6 +173,11 @@ const ApiAuthInstagramCallbackRoute =
     path: '/callback',
     getParentRoute: () => ApiAuthInstagramRoute,
   } as any)
+const ApiAuthInstagramHandoffRoute = ApiAuthInstagramHandoffRouteImport.update({
+  id: '/handoff',
+  path: '/handoff',
+  getParentRoute: () => ApiAuthInstagramRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -200,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/inquiries/': typeof AppInquiriesIndexRoute
   '/posts/': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
+  '/api/auth/instagram/handoff': typeof ApiAuthInstagramHandoffRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -226,6 +233,7 @@ export interface FileRoutesByTo {
   '/inquiries': typeof AppInquiriesIndexRoute
   '/posts': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
+  '/api/auth/instagram/handoff': typeof ApiAuthInstagramHandoffRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -256,6 +264,7 @@ export interface FileRoutesById {
   '/_app/inquiries/': typeof AppInquiriesIndexRoute
   '/_app/posts/': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
+  '/api/auth/instagram/handoff': typeof ApiAuthInstagramHandoffRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/inquiries/'
     | '/posts/'
     | '/api/auth/instagram/callback'
+    | '/api/auth/instagram/handoff'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/inquiries'
     | '/posts'
     | '/api/auth/instagram/callback'
+    | '/api/auth/instagram/handoff'
   id:
     | '__root__'
     | '/'
@@ -341,6 +352,7 @@ export interface FileRouteTypes {
     | '/_app/inquiries/'
     | '/_app/posts/'
     | '/api/auth/instagram/callback'
+    | '/api/auth/instagram/handoff'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -549,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthInstagramCallbackRouteImport
       parentRoute: typeof ApiAuthInstagramRoute
     }
+    '/api/auth/instagram/handoff': {
+      id: '/api/auth/instagram/handoff'
+      path: '/handoff'
+      fullPath: '/api/auth/instagram/handoff'
+      preLoaderRoute: typeof ApiAuthInstagramHandoffRouteImport
+      parentRoute: typeof ApiAuthInstagramRoute
+    }
   }
 }
 
@@ -610,10 +629,12 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface ApiAuthInstagramRouteChildren {
   ApiAuthInstagramCallbackRoute: typeof ApiAuthInstagramCallbackRoute
+  ApiAuthInstagramHandoffRoute: typeof ApiAuthInstagramHandoffRoute
 }
 
 const ApiAuthInstagramRouteChildren: ApiAuthInstagramRouteChildren = {
   ApiAuthInstagramCallbackRoute: ApiAuthInstagramCallbackRoute,
+  ApiAuthInstagramHandoffRoute: ApiAuthInstagramHandoffRoute,
 }
 
 const ApiAuthInstagramRouteWithChildren =

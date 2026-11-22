@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertCircle, ArrowRight, Instagram } from "lucide-react";
+import { AlertCircle, ArrowRight, ArrowUpRight, Instagram } from "lucide-react";
 import { DemoEntryButton } from "@/components/demo-entry-button";
 import {
   InstagramConnectLink,
-  InstagramTesterInviteActions,
+  InstagramTesterInviteLink,
 } from "@/components/instagram-connect-link";
 import { PublicLayout } from "@/components/public-layout";
 import { getBootstrap } from "@/lib/hypeup/bootstrap";
@@ -91,7 +91,10 @@ function ConnectPage() {
                 </strong>{" "}
                 탭을 열고 Lens용 앱 초대를 수락해 주세요.
               </p>
-              <InstagramTesterInviteActions />
+              <InstagramTesterInviteLink className="lens-button lens-button-primary mt-3 w-full">
+                Instagram 웹사이트 권한 열기
+                <ArrowUpRight className="size-4 shrink-0" aria-hidden />
+              </InstagramTesterInviteLink>
             </li>
             <li className="py-4 sm:py-5">
               <h2 className="flex items-center gap-2.5 text-base font-semibold tracking-tight">

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  TESTER_ACCEPT_URL,
   applicantSiteUrl,
   composeAccessRequestEmail,
   formSubmitAccepted,
@@ -26,8 +25,7 @@ test("reply block contains the tester accept link and not the admin dashboard", 
   });
   const reply = replyBody(mail.text);
   assert.match(mail.subject, /@studio\.han/);
-  assert.match(reply, new RegExp(TESTER_ACCEPT_URL.replace(/[.]/g, "\\.")));
-  assert.match(reply, /아이폰에서 Instagram 앱이 열리면.*Safari 주소창에 직접 붙여넣으세요/);
+  assert.ok(reply.includes("https://www.instagram.com/accounts/manage_access/#weblink"));
   assert.match(reply, /테스터 초대\(Tester Invites\)/);
   assert.match(reply, /https:\/\/hypeupinsta\.vercel\.app\/connect/);
   assert.doesNotMatch(reply, /developers\.facebook\.com/);

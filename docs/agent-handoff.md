@@ -45,7 +45,7 @@
 - 긴 토큰: GET `https://graph.instagram.com/access_token?grant_type=ig_exchange_token`. POST는 지원되지 않아 `Object with ID 'access_token'` 오류가 난다. 그 문장에 permissions가 있어도 테스터 미등록으로 보여주지 않는다. 거절되면 1시간 토큰으로 `/me` 를 계속한다.
 - 앱 그래프 버전은 `IG_GRAPH_VERSION=v21.0` 이다. 대시보드 호출 예시는 v26일 수 있다. 버전 때문에 위 POST 오류가 난 것은 아니다.
 - Standard Access다. 인스타그램 테스터로 초대를 수락한 프로페셔널 계정만 API가 된다. 개인 계정은 안 된다.
-- 인스타그램 앱과 웹사이트의 활성 탭은 OAuth 허용 기록이다. 테스터 수락은 맨 오른쪽 테스터 초대 탭뿐이다. `https://www.instagram.com/accounts/manage_access/`
+- 인스타그램 앱과 웹사이트의 활성 탭은 OAuth 허용 기록이다. 테스터 수락은 맨 오른쪽 테스터 초대 탭뿐이다. `https://www.instagram.com/accounts/manage_access/#weblink` 의 `#weblink` 는 Instagram이 iOS 유니버설 링크에서 제외한 값이다.
 - 역할 확인 시점: Alvin Han 관리자, `text.presso` 와 `taewooet` 는 인스타그램 테스터, `navi_gate_` 는 Pending이었다.
 
 ## 폰 로그인

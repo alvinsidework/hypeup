@@ -106,7 +106,6 @@ export function composeAccessRequestEmail(input: {
     "",
     "1. 웹 브라우저에서 테스터 초대 수락",
     TESTER_ACCEPT_URL,
-    "아이폰에서 Instagram 앱이 열리면 위 주소를 복사해 Safari 주소창에 직접 붙여넣으세요.",
     "",
     `인스타그램에 @${input.instagram} 계정으로 로그인한 뒤, 앱 및 웹사이트의 ‘테스터 초대(Tester Invites)’ 탭에서 초대를 수락해 주세요.`,
     "",

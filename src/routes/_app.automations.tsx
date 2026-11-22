@@ -34,6 +34,7 @@ function AutomationsPage() {
         publicReplies: draft.publicReplies,
         dmMessage: draft.dmMessage,
         hideComment: draft.hideComment,
+        followersOnly: draft.followersOnly,
         sortOrder: draft.sortOrder,
       },
     });
@@ -81,6 +82,7 @@ function AutomationsPage() {
                     <h2 className="text-[15px] font-medium">{rule.name}</h2>
                     <p className="mt-1 text-[12px] text-muted">
                       {rule.matchMode} · {rule.keywords.join(", ") || "모든 댓글"}
+                      {rule.followersOnly ? " · 팔로워만" : ""}
                     </p>
                   </div>
                   <label className="flex h-10 items-center gap-2 text-[12px] text-muted">

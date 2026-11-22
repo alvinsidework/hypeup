@@ -44,6 +44,7 @@ const ruleSchema = z.object({
   publicReplies: z.array(z.string()).max(5),
   dmMessage: z.string().nullable(),
   hideComment: z.boolean(),
+  followersOnly: z.boolean().default(false),
   sortOrder: z.number().int().optional(),
 });
 
@@ -187,6 +188,7 @@ export const saveRuleFn = createServerFn({ method: "POST" })
       publicReplies: data.publicReplies,
       dmMessage: data.dmMessage,
       hideComment: data.hideComment,
+      followersOnly: data.followersOnly,
       id: data.id,
       sortOrder: data.sortOrder ?? 0,
     });

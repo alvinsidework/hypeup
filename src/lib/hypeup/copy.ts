@@ -31,6 +31,9 @@ export const copy = {
   tokenExpiring: "토큰이 곧 만료됩니다. 다시 연결하세요.",
   tokenExpired: "연결이 만료되었습니다. 다시 연결하세요.",
   webhookOff: "실시간 자동화가 꺼져 있습니다. 설정에서 다시 구독하세요.",
+  followerAsk: "팔로워에게만 안내를 보냅니다. 팔로우한 뒤 이 메시지에 답장해 주세요.",
+  followerRemind: "아직 팔로우가 확인되지 않습니다. 팔로우한 뒤 다시 답장해 주세요.",
+  followerPublicOnly: "댓글에 답글을 남겼습니다.",
   disconnect: "연결 해제",
   resubscribe: "다시 구독",
   personalAccount:

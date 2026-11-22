@@ -1,5 +1,17 @@
 import { graphPost } from "./client";
 
+export async function sendDirectMessage(
+  token: string,
+  igUserId: string,
+  recipientId: string,
+  text: string,
+): Promise<unknown> {
+  return graphPost(token, `/${igUserId}/messages`, {
+    recipient: { id: recipientId },
+    message: { text },
+  });
+}
+
 export async function sendPrivateReply(
   token: string,
   igUserId: string,

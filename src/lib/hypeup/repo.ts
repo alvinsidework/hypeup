@@ -67,6 +67,7 @@ type RuleRow = {
   public_replies: string[] | null;
   dm_message: string | null;
   hide_comment: boolean;
+  followers_only?: boolean;
   sort_order: number;
   updated_at: string | Date;
 };
@@ -177,6 +178,7 @@ function mapRule(row: RuleRow): RuleItem {
     publicReplies: asStringArray(row.public_replies),
     dmMessage: row.dm_message,
     hideComment: asBool(row.hide_comment),
+    followersOnly: asBool(row.followers_only),
     sortOrder: Number(row.sort_order ?? 0),
     updatedAt: asIso(row.updated_at) ?? new Date().toISOString(),
   };
@@ -469,8 +471,8 @@ export async function saveRule(
   await sql.query(
     `insert into hypeup_rule (
       id, user_id, name, enabled, scope, media_id, match_mode, keywords, exclude_keywords,
-      public_replies, dm_message, hide_comment, sort_order, updated_at
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now())
+      public_replies, dm_message, hide_comment, followers_only, sort_order, updated_at
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
     on conflict (id) do update set
       name = excluded.name,
       enabled = excluded.enabled,
@@ -482,6 +484,7 @@ export async function saveRule(
       public_replies = excluded.public_replies,
       dm_message = excluded.dm_message,
       hide_comment = excluded.hide_comment,
+      followers_only = excluded.followers_only,
       sort_order = excluded.sort_order,
       updated_at = now()`,
     [
@@ -497,12 +500,94 @@ export async function saveRule(
       rule.publicReplies,
       rule.dmMessage,
       rule.hideComment,
+      rule.followersOnly,
       rule.sortOrder,
     ],
   );
   const rows = await sql.query<RuleRow>("select * from hypeup_rule where id = $1", [id]);
   if (!rows[0]) throw new Error("Failed to save rule");
   return mapRule(rows[0]);
+}
+
+export type FollowGateRecord = {
+  id: string;
+  userId: string;
+  commentId: string;
+  ruleId: string;
+  igFromUsername: string | null;
+  status: string;
+};
+
+export async function upsertFollowGate(input: {
+  userId: string;
+  commentId: string;
+  ruleId: string;
+  igFromUsername: string | null;
+}): Promise<void> {
+  const sql = await getSql();
+  await sql.query(
+    `insert into hypeup_follow_gate (id, user_id, comment_id, rule_id, ig_from_username)
+     values ($1, $2, $3, $4, $5)
+     on conflict (user_id, comment_id) do update set
+       rule_id = excluded.rule_id,
+       ig_from_username = excluded.ig_from_username
+     where hypeup_follow_gate.status = 'pending'`,
+    [newId(), input.userId, input.commentId, input.ruleId, input.igFromUsername],
+  );
+}
+
+export async function listPendingFollowGates(userId: string): Promise<FollowGateRecord[]> {
+  const sql = await getSql();
+  const rows = await sql.query<{
+    id: string;
+    user_id: string;
+    comment_id: string;
+    rule_id: string;
+    ig_from_username: string | null;
+    status: string;
+  }>(
+    `select id, user_id, comment_id, rule_id, ig_from_username, status
+     from hypeup_follow_gate
+     where user_id = $1 and status = 'pending'
+     order by created_at desc`,
+    [userId],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    commentId: row.comment_id,
+    ruleId: row.rule_id,
+    igFromUsername: row.ig_from_username,
+    status: row.status,
+  }));
+}
+
+export async function claimFollowGate(id: string, userId: string): Promise<boolean> {
+  const sql = await getSql();
+  const rows = await sql.query<{ id: string }>(
+    `update hypeup_follow_gate set status = 'sending'
+     where id = $1 and user_id = $2 and status = 'pending'
+     returning id`,
+    [id, userId],
+  );
+  return Boolean(rows[0]);
+}
+
+export async function finishFollowGate(id: string, status: "sent" | "pending" | "skipped"): Promise<void> {
+  const sql = await getSql();
+  await sql.query("update hypeup_follow_gate set status = $2 where id = $1", [id, status]);
+}
+
+export async function claimFollowReminder(id: string): Promise<boolean> {
+  const sql = await getSql();
+  const rows = await sql.query<{ id: string }>(
+    `update hypeup_follow_gate set reminded_at = now()
+     where id = $1 and status = 'pending'
+       and (reminded_at is null or reminded_at < now() - interval '6 hours')
+     returning id`,
+    [id],
+  );
+  return Boolean(rows[0]);
 }
 
 export async function deleteRule(userId: string, id: string): Promise<void> {

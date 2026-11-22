@@ -4,7 +4,7 @@ import type { GraphList, IgComment } from "./types";
 export async function listMediaComments(token: string, mediaId: string): Promise<GraphList<IgComment>> {
   try {
     return await graphGet<GraphList<IgComment>>(token, `/${mediaId}/comments`, {
-      fields: "id,text,username,timestamp,replies{id,text,username,timestamp}",
+      fields: "id,text,username,timestamp,from,replies{id,text,username,timestamp,from}",
     });
   } catch {
     return graphGet<GraphList<IgComment>>(token, `/${mediaId}/comments`, {

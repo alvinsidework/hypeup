@@ -15,9 +15,14 @@ import {
   listMedia,
   listRules,
   overviewStats,
+  claimFollowGate,
+  claimFollowReminder,
+  finishFollowGate,
+  listPendingFollowGates,
   saveRule,
   setWebhookSubscribed,
   updateCommentFlags,
+  upsertFollowGate,
   updateUserToken,
   upsertComment,
   upsertMedia,
@@ -29,7 +34,9 @@ import type { CommentItem, RuleItem } from "./types";
 import { deleteComment, hideComment, listMediaComments, replyToComment } from "@/lib/instagram/comments";
 import { graphErrorPayload, koreanError } from "@/lib/instagram/errors";
 import { canPrivateReply, matchRule, pickPublicReply, PRIVATE_REPLY_WINDOW_MS } from "@/lib/instagram/engine";
-import { sendPrivateReply, subscribeApps } from "@/lib/instagram/messages";
+import { lookupFollower } from "@/lib/instagram/follow";
+import { sameInstagramUsername } from "@/lib/instagram/follow-parse";
+import { sendDirectMessage, sendPrivateReply, subscribeApps } from "@/lib/instagram/messages";
 import { listMyMedia } from "@/lib/instagram/media";
 import type { IgComment } from "@/lib/instagram/types";
 
@@ -316,6 +323,42 @@ export async function executeRuleOnComment(user: UserRecord, comment: CommentIte
   }
 
   const publicText = pickPublicReply(rule);
+  if (rule.followersOnly && (publicText || rule.dmMessage)) {
+    await upsertFollowGate({
+      userId: user.id,
+      commentId: comment.id,
+      ruleId: rule.id,
+      igFromUsername: comment.igFromUsername,
+    });
+    if (!comment.repliedPrivate) {
+      try {
+        await privateReply(user, comment.id, copy.followerAsk);
+      } catch (error) {
+        await addLog({
+          userId: user.id,
+          type: "ERROR",
+          success: false,
+          commentId: comment.id,
+          ruleId: rule.id,
+          message: koreanError(error),
+          meta: graphErrorPayload(error),
+        });
+      }
+    } else {
+      await addLog({
+        userId: user.id,
+        type: "ERROR",
+        success: false,
+        commentId: comment.id,
+        mediaId: comment.mediaId,
+        ruleId: rule.id,
+        message: "이미 DM을 보낸 댓글이라 팔로워 확인을 요청하지 못했습니다.",
+      });
+    }
+    await updateCommentFlags(user.id, comment.id, { automationProcessedAt: new Date().toISOString() });
+    return { skipped: "follower_gate" as const, ruleId: rule.id };
+  }
+
   if (publicText) {
     try {
       await publicReply(user, comment.id, publicText);
@@ -402,6 +445,128 @@ export async function ingestWebhookComment(event: {
     message: "댓글 webhook을 수신했습니다.",
   });
   await executeRuleOnComment(user, comment);
+}
+
+export async function ingestWebhookMessage(event: { igUserId: string; senderId: string }) {
+  const user = await findUserByIgId(event.igUserId);
+  if (!user || user.isDemo || isDemoMode()) return;
+  const token = plainToken(user);
+  if (!token) return;
+  const gates = await listPendingFollowGates(user.id);
+  if (gates.length === 0) return;
+
+  const profile = await lookupFollower(token, event.senderId);
+  const named = profile.username
+    ? gates.filter((gate) => sameInstagramUsername(gate.igFromUsername, profile.username))
+    : [];
+  const targets = named.length > 0 ? named : !profile.username && gates.length === 1 ? gates : [];
+  if (targets.length === 0) return;
+
+  if (profile.status === "unknown") {
+    await addLog({
+      userId: user.id,
+      type: "ERROR",
+      success: false,
+      message: "팔로워 여부를 확인하지 못했습니다.",
+    });
+    return;
+  }
+
+  for (const gate of targets) {
+    if (profile.status === "not_follower") {
+      const reminded = await claimFollowReminder(gate.id);
+      if (!reminded) continue;
+      try {
+        await sendDirectMessage(token, user.igUserId, event.senderId, copy.followerRemind);
+      } catch (error) {
+        await addLog({
+          userId: user.id,
+          type: "ERROR",
+          success: false,
+          commentId: gate.commentId,
+          ruleId: gate.ruleId,
+          message: koreanError(error),
+          meta: graphErrorPayload(error),
+        });
+      }
+      await addLog({
+        userId: user.id,
+        type: "MATCH",
+        success: false,
+        commentId: gate.commentId,
+        ruleId: gate.ruleId,
+        message: "팔로워가 아니라 공개 대댓글과 DM을 보류했습니다.",
+      });
+      continue;
+    }
+
+    const claimed = await claimFollowGate(gate.id, user.id);
+    if (!claimed) continue;
+    const rule = (await listRules(user.id)).find((item) => item.id === gate.ruleId);
+    if (!rule?.enabled) {
+      await finishFollowGate(gate.id, "skipped");
+      continue;
+    }
+    const comment = await getComment(user.id, gate.commentId);
+    let delivered = false;
+    const publicText = pickPublicReply(rule);
+    if (publicText && comment && !comment.repliedPublic) {
+      try {
+        await publicReply(user, comment.id, publicText);
+        delivered = true;
+      } catch (error) {
+        await addLog({
+          userId: user.id,
+          type: "ERROR",
+          success: false,
+          commentId: gate.commentId,
+          ruleId: gate.ruleId,
+          message: koreanError(error),
+          meta: graphErrorPayload(error),
+        });
+      }
+    }
+    if (rule.dmMessage) {
+      try {
+        await sendDirectMessage(token, user.igUserId, event.senderId, rule.dmMessage);
+        delivered = true;
+        await addLog({
+          userId: user.id,
+          type: "PRIVATE_REPLY",
+          success: true,
+          commentId: gate.commentId,
+          mediaId: comment?.mediaId,
+          ruleId: gate.ruleId,
+          message: "팔로워 확인 후 DM을 보냈습니다.",
+        });
+      } catch (error) {
+        await addLog({
+          userId: user.id,
+          type: "ERROR",
+          success: false,
+          commentId: gate.commentId,
+          ruleId: gate.ruleId,
+          message: koreanError(error),
+          meta: graphErrorPayload(error),
+        });
+      }
+    } else if (delivered) {
+      try {
+        await sendDirectMessage(token, user.igUserId, event.senderId, copy.followerPublicOnly);
+      } catch (error) {
+        await addLog({
+          userId: user.id,
+          type: "ERROR",
+          success: false,
+          commentId: gate.commentId,
+          ruleId: gate.ruleId,
+          message: koreanError(error),
+          meta: graphErrorPayload(error),
+        });
+      }
+    }
+    await finishFollowGate(gate.id, delivered ? "sent" : "pending");
+  }
 }
 
 export async function resubscribe(user: UserRecord) {

@@ -15,6 +15,7 @@ function rule(partial: Partial<MatchRule> & Pick<MatchRule, "id" | "name">): Mat
     publicReplies: ["ok"],
     dmMessage: null,
     hideComment: false,
+    followersOnly: false,
     sortOrder: 0,
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...partial,

@@ -15,6 +15,7 @@ const EMPTY: RuleDraft = {
   publicReplies: [""],
   dmMessage: "",
   hideComment: false,
+  followersOnly: false,
 };
 
 function splitKeywords(value: string): string[] {
@@ -174,6 +175,22 @@ export function RuleForm({
           onChange={(event) => setDraft({ ...draft, hideComment: event.target.checked })}
         />
         댓글 숨김
+      </label>
+
+      <label className="flex items-start gap-2 text-[13px]">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={draft.followersOnly}
+          onChange={(event) => setDraft({ ...draft, followersOnly: event.target.checked })}
+        />
+        <span>
+          팔로워에게만
+          <span className="mt-1 block text-[12px] text-muted">
+            키워드가 맞아도, 그 사람이 나를 팔로우한 것이 확인될 때만 공개 대댓글과 DM을 보냅니다.
+            댓글만으로는 확인할 수 없어서, 먼저 짧은 DM으로 답장을 요청합니다.
+          </span>
+        </span>
       </label>
 
       <div className="flex gap-2">

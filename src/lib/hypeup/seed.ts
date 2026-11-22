@@ -172,6 +172,7 @@ export async function ensureDemoData(): Promise<void> {
     publicReplies: ["가격은 디엠으로 보내드렸어요.", "견적 안내 드렸습니다. 디엠 확인해주세요."],
     dmMessage: "안녕하세요, 하나 스튜디오입니다. 보울 가격은 48,000원이고 예약 링크는 https://hypeup.example/bowl 입니다.",
     hideComment: false,
+    followersOnly: false,
     sortOrder: 0,
   });
   await saveRule(DEMO_USER_ID, {
@@ -185,6 +186,7 @@ export async function ensureDemoData(): Promise<void> {
     publicReplies: ["링크 디엠으로 보내드렸어요."],
     dmMessage: "요청하신 링크입니다: https://hypeup.example/swatch",
     hideComment: false,
+    followersOnly: false,
     sortOrder: 1,
   });
   await saveRule(DEMO_USER_ID, {
@@ -198,6 +200,7 @@ export async function ensureDemoData(): Promise<void> {
     publicReplies: [],
     dmMessage: null,
     hideComment: true,
+    followersOnly: false,
     sortOrder: 2,
   });
 

@@ -1,5 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+export type NormalizedMessageEvent = {
+  igUserId: string;
+  senderId: string;
+  text: string;
+  mid: string | null;
+};
+
 export type NormalizedCommentEvent = {
   igUserId: string;
   commentId: string;
@@ -73,6 +80,38 @@ export function parseWebhookPayload(payload: unknown): NormalizedCommentEvent[] 
       if (!value) continue;
       const event = fromValue(value, igUserId);
       if (event) events.push(event);
+    }
+  }
+
+  return events;
+}
+
+export function parseMessageEvents(payload: unknown): NormalizedMessageEvent[] {
+  const root = asRecord(payload);
+  if (!root) return [];
+  const entries = Array.isArray(root.entry) ? root.entry : [];
+  const events: NormalizedMessageEvent[] = [];
+
+  for (const entry of entries) {
+    const record = asRecord(entry);
+    if (!record) continue;
+    const igUserId = typeof record.id === "string" ? record.id : "";
+    if (!igUserId) continue;
+    const messaging = Array.isArray(record.messaging) ? record.messaging : [];
+    for (const item of messaging) {
+      const messageRecord = asRecord(item);
+      const message = asRecord(messageRecord?.message);
+      if (!messageRecord || !message) continue;
+      if (message.is_echo === true || message.is_deleted === true) continue;
+      const sender = asRecord(messageRecord.sender);
+      const senderId = typeof sender?.id === "string" ? sender.id : "";
+      if (!senderId || senderId === igUserId) continue;
+      events.push({
+        igUserId,
+        senderId,
+        text: typeof message.text === "string" ? message.text : "",
+        mid: typeof message.mid === "string" ? message.mid : null,
+      });
     }
   }
 

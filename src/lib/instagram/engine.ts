@@ -26,6 +26,7 @@ export type MatchRule = Pick<
   | "publicReplies"
   | "dmMessage"
   | "hideComment"
+  | "followersOnly"
   | "sortOrder"
   | "updatedAt"
 >;

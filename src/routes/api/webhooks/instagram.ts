@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { instagramAppSecret, instagramWebhookVerifyToken } from "@/lib/hypeup/env.server";
-import { ingestWebhookComment } from "@/lib/hypeup/actions.server";
-import { parseWebhookPayload, verifyWebhookSignature } from "@/lib/instagram/webhooks";
+import { ingestWebhookComment, ingestWebhookMessage } from "@/lib/hypeup/actions.server";
+import { parseMessageEvents, parseWebhookPayload, verifyWebhookSignature } from "@/lib/instagram/webhooks";
 
 export const Route = createFileRoute("/api/webhooks/instagram")({
   server: {
@@ -39,6 +39,13 @@ export const Route = createFileRoute("/api/webhooks/instagram")({
             await ingestWebhookComment(event);
           } catch (error) {
             console.error("[hypeup] webhook event failed", error);
+          }
+        }
+        for (const event of parseMessageEvents(payload)) {
+          try {
+            await ingestWebhookMessage(event);
+          } catch (error) {
+            console.error("[hypeup] webhook message failed", error);
           }
         }
         return new Response("ok", { status: 200 });

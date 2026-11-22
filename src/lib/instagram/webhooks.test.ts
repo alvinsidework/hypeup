@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
-import { parseWebhookPayload, verifyWebhookSignature } from "./webhooks.ts";
+import { parseMessageEvents, parseWebhookPayload, verifyWebhookSignature } from "./webhooks.ts";
 
 test("rejects a bad webhook signature", () => {
   const body = "{\"object\":\"instagram\"}";
@@ -33,6 +33,24 @@ test("parses Instagram Login comment payloads", () => {
   assert.equal(events.length, 1);
   assert.equal(events[0]?.commentId, "c1");
   assert.equal(events[0]?.mediaId, "m1");
+});
+
+test("parses a follower reply and skips echoes", () => {
+  const events = parseMessageEvents({
+    object: "instagram",
+    entry: [
+      {
+        id: "ig-user",
+        messaging: [
+          { sender: { id: "ig-user" }, message: { text: "echo", is_echo: true } },
+          { sender: { id: "person" }, message: { mid: "m1", text: "팔로우했어요" } },
+        ],
+      },
+    ],
+  });
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.senderId, "person");
+  assert.equal(events[0]?.text, "팔로우했어요");
 });
 
 test("parses Facebook-style changes[] payloads", () => {

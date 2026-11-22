@@ -65,6 +65,7 @@ export type RuleItem = {
   publicReplies: string[];
   dmMessage: string | null;
   hideComment: boolean;
+  followersOnly: boolean;
   sortOrder: number;
   updatedAt: string;
 };

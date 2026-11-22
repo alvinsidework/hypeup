@@ -57,7 +57,7 @@ export function RuleSimulator({
             <p className="text-muted">대댓글: {preview.publicReply ?? "없음"}</p>
             <p className="text-muted">DM: {preview.dmMessage ?? "없음"}</p>
             {preview.rule.followersOnly ? (
-              <p className="text-muted">팔로워가 확인된 뒤에 보냅니다</p>
+              <p className="text-muted">확인된 팔로워는 바로, 그 외에는 안내 받기 버튼 뒤에 보냅니다</p>
             ) : null}
             {preview.hideComment ? <p className="text-danger">댓글을 숨깁니다</p> : null}
           </>

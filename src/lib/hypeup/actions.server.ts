@@ -6,8 +6,10 @@ import {
   clearUserToken,
   deleteCommentRow,
   deleteRule,
+  findKnownFollower,
   findUserById,
   findUserByIgId,
+  forgetKnownFollower,
   getComment,
   getMedia,
   listComments,
@@ -19,6 +21,7 @@ import {
   claimFollowReminder,
   finishFollowGate,
   listPendingFollowGates,
+  rememberFollower,
   saveRule,
   setWebhookSubscribed,
   updateCommentFlags,
@@ -35,7 +38,7 @@ import { deleteComment, hideComment, listMediaComments, replyToComment } from "@
 import { graphErrorPayload, koreanError } from "@/lib/instagram/errors";
 import { canPrivateReply, matchRule, pickPublicReply, PRIVATE_REPLY_WINDOW_MS } from "@/lib/instagram/engine";
 import { lookupFollower } from "@/lib/instagram/follow";
-import { sameInstagramUsername } from "@/lib/instagram/follow-parse";
+import { followGatePayload, parseFollowGatePayload, sameInstagramUsername } from "@/lib/instagram/follow-parse";
 import { sendDirectMessage, sendPrivateReply, subscribeApps } from "@/lib/instagram/messages";
 import { listMyMedia } from "@/lib/instagram/media";
 import type { IgComment } from "@/lib/instagram/types";
@@ -219,7 +222,12 @@ export async function publicReply(user: UserRecord, commentId: string, message: 
   });
 }
 
-export async function privateReply(user: UserRecord, commentId: string, message: string) {
+export async function privateReply(
+  user: UserRecord,
+  commentId: string,
+  message: string,
+  options?: { quickReply?: { title: string; payload: string }; logMessage?: string },
+) {
   const comment = await getComment(user.id, commentId);
   if (!comment) throw new Error("not_found");
   const gate = canPrivateReply(comment);
@@ -227,7 +235,7 @@ export async function privateReply(user: UserRecord, commentId: string, message:
   if (!user.isDemo && !isDemoMode()) {
     const token = plainToken(user);
     if (!token) throw new Error("token_expired");
-    await sendPrivateReply(token, user.igUserId, commentId, message);
+    await sendPrivateReply(token, user.igUserId, commentId, message, options?.quickReply);
   }
   await updateCommentFlags(user.id, commentId, { repliedPrivate: true });
   await addLog({
@@ -236,7 +244,7 @@ export async function privateReply(user: UserRecord, commentId: string, message:
     success: true,
     commentId,
     mediaId: comment.mediaId,
-    message: "댓글 DM을 보냈습니다.",
+    message: options?.logMessage ?? "댓글 DM을 보냈습니다.",
   });
 }
 
@@ -324,39 +332,67 @@ export async function executeRuleOnComment(user: UserRecord, comment: CommentIte
 
   const publicText = pickPublicReply(rule);
   if (rule.followersOnly && (publicText || rule.dmMessage)) {
-    await upsertFollowGate({
-      userId: user.id,
-      commentId: comment.id,
-      ruleId: rule.id,
-      igFromUsername: comment.igFromUsername,
-    });
-    if (!comment.repliedPrivate) {
-      try {
-        await privateReply(user, comment.id, copy.followerAsk);
-      } catch (error) {
+    const known = await findKnownFollower(user.id, comment.igFromUsername);
+    let deliverNow = false;
+    if (known) {
+      deliverNow = true;
+      const token = !user.isDemo && !isDemoMode() ? plainToken(user) : null;
+      if (known.senderIgsid && token) {
+        const profile = await lookupFollower(token, known.senderIgsid);
+        if (profile.status === "not_follower") {
+          deliverNow = false;
+          await forgetKnownFollower(user.id, known.igUsername);
+        }
+      }
+    }
+    if (deliverNow) {
+      await addLog({
+        userId: user.id,
+        type: "MATCH",
+        success: true,
+        commentId: comment.id,
+        mediaId: comment.mediaId,
+        ruleId: rule.id,
+        message: "확인된 팔로워라 바로 보냅니다.",
+      });
+    } else {
+      const gateId = await upsertFollowGate({
+        userId: user.id,
+        commentId: comment.id,
+        ruleId: rule.id,
+        igFromUsername: comment.igFromUsername,
+      });
+      if (!comment.repliedPrivate) {
+        try {
+          await privateReply(user, comment.id, copy.followerAsk, {
+            quickReply: { title: copy.followerButton, payload: followGatePayload(gateId) },
+            logMessage: "안내 받기 버튼을 보냈습니다.",
+          });
+        } catch (error) {
+          await addLog({
+            userId: user.id,
+            type: "ERROR",
+            success: false,
+            commentId: comment.id,
+            ruleId: rule.id,
+            message: koreanError(error),
+            meta: graphErrorPayload(error),
+          });
+        }
+      } else {
         await addLog({
           userId: user.id,
           type: "ERROR",
           success: false,
           commentId: comment.id,
+          mediaId: comment.mediaId,
           ruleId: rule.id,
-          message: koreanError(error),
-          meta: graphErrorPayload(error),
+          message: "이미 DM을 보낸 댓글이라 안내 받기 버튼을 보내지 못했습니다.",
         });
       }
-    } else {
-      await addLog({
-        userId: user.id,
-        type: "ERROR",
-        success: false,
-        commentId: comment.id,
-        mediaId: comment.mediaId,
-        ruleId: rule.id,
-        message: "이미 DM을 보낸 댓글이라 팔로워 확인을 요청하지 못했습니다.",
-      });
+      await updateCommentFlags(user.id, comment.id, { automationProcessedAt: new Date().toISOString() });
+      return { skipped: "follower_gate" as const, ruleId: rule.id };
     }
-    await updateCommentFlags(user.id, comment.id, { automationProcessedAt: new Date().toISOString() });
-    return { skipped: "follower_gate" as const, ruleId: rule.id };
   }
 
   if (publicText) {
@@ -447,7 +483,11 @@ export async function ingestWebhookComment(event: {
   await executeRuleOnComment(user, comment);
 }
 
-export async function ingestWebhookMessage(event: { igUserId: string; senderId: string }) {
+export async function ingestWebhookMessage(event: {
+  igUserId: string;
+  senderId: string;
+  payload?: string | null;
+}) {
   const user = await findUserByIgId(event.igUserId);
   if (!user || user.isDemo || isDemoMode()) return;
   const token = plainToken(user);
@@ -456,10 +496,13 @@ export async function ingestWebhookMessage(event: { igUserId: string; senderId: 
   if (gates.length === 0) return;
 
   const profile = await lookupFollower(token, event.senderId);
+  const gateId = parseFollowGatePayload(event.payload);
+  const fromButton = gateId ? gates.filter((gate) => gate.id === gateId) : [];
   const named = profile.username
     ? gates.filter((gate) => sameInstagramUsername(gate.igFromUsername, profile.username))
     : [];
-  const targets = named.length > 0 ? named : !profile.username && gates.length === 1 ? gates : [];
+  const targets =
+    fromButton.length > 0 ? fromButton : named.length > 0 ? named : !profile.username && gates.length === 1 ? gates : [];
   if (targets.length === 0) return;
 
   if (profile.status === "unknown") {
@@ -477,7 +520,10 @@ export async function ingestWebhookMessage(event: { igUserId: string; senderId: 
       const reminded = await claimFollowReminder(gate.id);
       if (!reminded) continue;
       try {
-        await sendDirectMessage(token, user.igUserId, event.senderId, copy.followerRemind);
+        await sendDirectMessage(token, user.igUserId, event.senderId, copy.followerRemind, {
+          title: copy.followerButton,
+          payload: followGatePayload(gate.id),
+        });
       } catch (error) {
         await addLog({
           userId: user.id,
@@ -564,6 +610,13 @@ export async function ingestWebhookMessage(event: { igUserId: string; senderId: 
           meta: graphErrorPayload(error),
         });
       }
+    }
+    if (delivered) {
+      await rememberFollower({
+        userId: user.id,
+        username: profile.username ?? gate.igFromUsername,
+        senderIgsid: event.senderId,
+      });
     }
     await finishFollowGate(gate.id, delivered ? "sent" : "pending");
   }

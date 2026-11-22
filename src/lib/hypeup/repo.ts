@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { normalizeInstagramUsername } from "@/lib/instagram/follow-parse";
 import { newId } from "./crypto.server";
 import type {
   CommentItem,
@@ -523,17 +524,71 @@ export async function upsertFollowGate(input: {
   commentId: string;
   ruleId: string;
   igFromUsername: string | null;
-}): Promise<void> {
+}): Promise<string> {
   const sql = await getSql();
-  await sql.query(
+  const rows = await sql.query<{ id: string }>(
     `insert into hypeup_follow_gate (id, user_id, comment_id, rule_id, ig_from_username)
      values ($1, $2, $3, $4, $5)
      on conflict (user_id, comment_id) do update set
        rule_id = excluded.rule_id,
        ig_from_username = excluded.ig_from_username
-     where hypeup_follow_gate.status = 'pending'`,
+     where hypeup_follow_gate.status = 'pending'
+     returning id`,
     [newId(), input.userId, input.commentId, input.ruleId, input.igFromUsername],
   );
+  if (rows[0]) return rows[0].id;
+  const existing = await sql.query<{ id: string }>(
+    "select id from hypeup_follow_gate where user_id = $1 and comment_id = $2",
+    [input.userId, input.commentId],
+  );
+  if (!existing[0]) throw new Error("follow gate missing");
+  return existing[0].id;
+}
+
+export type KnownFollower = {
+  igUsername: string;
+  senderIgsid: string | null;
+};
+
+export async function findKnownFollower(userId: string, username: string | null): Promise<KnownFollower | null> {
+  const igUsername = normalizeInstagramUsername(username);
+  if (!igUsername) return null;
+  const sql = await getSql();
+  const rows = await sql.query<{ ig_username: string; sender_igsid: string | null }>(
+    "select ig_username, sender_igsid from hypeup_known_follower where user_id = $1 and ig_username = $2",
+    [userId, igUsername],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return { igUsername: row.ig_username, senderIgsid: row.sender_igsid };
+}
+
+export async function rememberFollower(input: {
+  userId: string;
+  username: string | null;
+  senderIgsid: string;
+}): Promise<void> {
+  const igUsername = normalizeInstagramUsername(input.username);
+  if (!igUsername) return;
+  const sql = await getSql();
+  await sql.query(
+    `insert into hypeup_known_follower (id, user_id, ig_username, sender_igsid, confirmed_at)
+     values ($1, $2, $3, $4, now())
+     on conflict (user_id, ig_username) do update set
+       sender_igsid = excluded.sender_igsid,
+       confirmed_at = now()`,
+    [newId(), input.userId, igUsername, input.senderIgsid],
+  );
+}
+
+export async function forgetKnownFollower(userId: string, username: string | null): Promise<void> {
+  const igUsername = normalizeInstagramUsername(username);
+  if (!igUsername) return;
+  const sql = await getSql();
+  await sql.query("delete from hypeup_known_follower where user_id = $1 and ig_username = $2", [
+    userId,
+    igUsername,
+  ]);
 }
 
 export async function listPendingFollowGates(userId: string): Promise<FollowGateRecord[]> {

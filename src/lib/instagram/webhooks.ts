@@ -5,6 +5,7 @@ export type NormalizedMessageEvent = {
   senderId: string;
   text: string;
   mid: string | null;
+  payload: string | null;
 };
 
 export type NormalizedCommentEvent = {
@@ -101,16 +102,25 @@ export function parseMessageEvents(payload: unknown): NormalizedMessageEvent[] {
     for (const item of messaging) {
       const messageRecord = asRecord(item);
       const message = asRecord(messageRecord?.message);
-      if (!messageRecord || !message) continue;
-      if (message.is_echo === true || message.is_deleted === true) continue;
+      const postback = asRecord(messageRecord?.postback);
+      if (!messageRecord || (!message && !postback)) continue;
+      if (message?.is_echo === true || message?.is_deleted === true) continue;
       const sender = asRecord(messageRecord.sender);
       const senderId = typeof sender?.id === "string" ? sender.id : "";
       if (!senderId || senderId === igUserId) continue;
+      const quickReply = asRecord(message?.quick_reply);
+      const payload =
+        typeof quickReply?.payload === "string"
+          ? quickReply.payload
+          : typeof postback?.payload === "string"
+            ? postback.payload
+            : null;
       events.push({
         igUserId,
         senderId,
-        text: typeof message.text === "string" ? message.text : "",
-        mid: typeof message.mid === "string" ? message.mid : null,
+        text: typeof message?.text === "string" ? message.text : typeof postback?.title === "string" ? postback.title : "",
+        mid: typeof message?.mid === "string" ? message.mid : null,
+        payload,
       });
     }
   }

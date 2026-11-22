@@ -9,9 +9,25 @@ export function interpretFollowResponse(body: unknown): { status: FollowStatus; 
   return { status: "unknown", username };
 }
 
+export function normalizeInstagramUsername(value: string | null | undefined): string | null {
+  const normalized = value?.trim().replace(/^@/, "").toLowerCase() ?? "";
+  return normalized || null;
+}
+
 export function sameInstagramUsername(left: string | null | undefined, right: string | null | undefined): boolean {
-  const normalize = (value: string | null | undefined) => value?.trim().replace(/^@/, "").toLowerCase() ?? "";
-  const a = normalize(left);
-  const b = normalize(right);
-  return a.length > 0 && a === b;
+  const a = normalizeInstagramUsername(left);
+  const b = normalizeInstagramUsername(right);
+  return Boolean(a && a === b);
+}
+
+const FOLLOW_GATE_PREFIX = "hypeup_follow:";
+
+export function followGatePayload(gateId: string): string {
+  return `${FOLLOW_GATE_PREFIX}${gateId}`;
+}
+
+export function parseFollowGatePayload(payload: string | null | undefined): string | null {
+  if (!payload?.startsWith(FOLLOW_GATE_PREFIX)) return null;
+  const id = payload.slice(FOLLOW_GATE_PREFIX.length).trim();
+  return id || null;
 }

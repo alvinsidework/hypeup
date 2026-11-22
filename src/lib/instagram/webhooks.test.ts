@@ -51,6 +51,29 @@ test("parses a follower reply and skips echoes", () => {
   assert.equal(events.length, 1);
   assert.equal(events[0]?.senderId, "person");
   assert.equal(events[0]?.text, "팔로우했어요");
+  assert.equal(events[0]?.payload, null);
+});
+
+test("reads the follow button payload", () => {
+  const events = parseMessageEvents({
+    object: "instagram",
+    entry: [
+      {
+        id: "ig-user",
+        messaging: [
+          {
+            sender: { id: "person" },
+            message: {
+              mid: "m2",
+              text: "안내 받기",
+              quick_reply: { payload: "hypeup_follow:gate-1" },
+            },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(events[0]?.payload, "hypeup_follow:gate-1");
 });
 
 test("parses Facebook-style changes[] payloads", () => {

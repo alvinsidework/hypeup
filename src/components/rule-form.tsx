@@ -187,8 +187,8 @@ export function RuleForm({
         <span>
           팔로워에게만
           <span className="mt-1 block text-[12px] text-muted">
-            키워드가 맞아도, 그 사람이 나를 팔로우한 것이 확인될 때만 공개 대댓글과 DM을 보냅니다.
-            댓글만으로는 확인할 수 없어서, 먼저 짧은 DM으로 답장을 요청합니다.
+            처음 보는 사람에게는 안내 받기 버튼을 보냅니다. 팔로워가 누르면 공개 대댓글과 DM이 갑니다.
+            한 번 확인된 사람은 다음 댓글부터 버튼 없이 바로 받습니다.
           </span>
         </span>
       </label>

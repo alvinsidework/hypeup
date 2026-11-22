@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { LOG_TYPE_LABELS, LogTable } from "@/components/log-table";
 import { PageHeader } from "@/components/page-header";
+import { useTaskProgress } from "@/components/route-progress";
 import { copy } from "@/lib/hypeup/copy";
 import { getLogsPage } from "@/lib/hypeup/api";
 import type { EventLogItem } from "@/lib/hypeup/types";
@@ -15,24 +16,42 @@ export const Route = createFileRoute("/_app/logs")({
 
 function LogsPage() {
   const initial = Route.useLoaderData();
+  const startProgress = useTaskProgress();
+  const activeLoad = useRef<ReturnType<typeof startProgress> | null>(null);
   const [type, setType] = useState("");
   const [logs, setLogs] = useState<EventLogItem[]>(initial.logs);
   const [loading, setLoading] = useState(false);
   const [exhausted, setExhausted] = useState(false);
 
+  useEffect(
+    () => () => {
+      activeLoad.current?.finish();
+      activeLoad.current = null;
+    },
+    [],
+  );
+
   async function load(next: string, append = false) {
+    if (activeLoad.current) return;
+    const task = startProgress({ label: "활동 기록 불러오는 중" });
+    activeLoad.current = task;
     setLoading(true);
     try {
       const page = await getLogsPage({
         data: { type: next || undefined, offset: append ? logs.length : 0 },
       });
+      if (activeLoad.current !== task) return;
       setType(next);
       setLogs((current) => (append ? [...current, ...page.logs] : page.logs));
       setExhausted(page.logs.length === 0);
     } catch {
-      toast.error(copy.genericError);
+      if (activeLoad.current === task) toast.error(copy.genericError);
     } finally {
-      setLoading(false);
+      task.finish();
+      if (activeLoad.current === task) {
+        activeLoad.current = null;
+        setLoading(false);
+      }
     }
   }
 
@@ -60,11 +79,6 @@ function LogsPage() {
             </option>
           ))}
         </select>
-        {loading ? (
-          <span role="status" className="text-sm text-muted">
-            불러오는 중
-          </span>
-        ) : null}
       </div>
       {logs.length === 0 ? (
         <EmptyState title={copy.emptyLogs} />

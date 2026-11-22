@@ -28,12 +28,16 @@ import {
   upsertFollowGate,
   updateUserToken,
   upsertComment,
+  upsertCommentBatch,
   upsertMedia,
+  upsertMediaBatch,
   type UserRecord,
 } from "./repo";
 import { ensureDemoData } from "./seed";
 import { getSession } from "./session.server";
-import type { CommentItem, RuleItem } from "./types";
+import { getFollowerMessages } from "./rule-messages";
+import type { InstagramSyncEvent, InstagramSyncInput, SyncReport } from "./sync-contract";
+import type { CommentItem, MediaItem, RuleItem } from "./types";
 import { deleteComment, hideComment, listMediaComments, replyToComment } from "@/lib/instagram/comments";
 import { graphErrorPayload, koreanError } from "@/lib/instagram/errors";
 import { canPrivateReply, matchRule, pickPublicReply, PRIVATE_REPLY_WINDOW_MS } from "@/lib/instagram/engine";
@@ -70,9 +74,18 @@ function plainToken(user: UserRecord): string | null {
   return decryptToken(user.tokenCipher);
 }
 
-async function flattenComments(userId: string, mediaId: string, comments: IgComment[], parentId: string | null) {
+type ImportedComment = Omit<CommentItem, "media" | "automationProcessedAt">;
+type SyncComplete = Extract<InstagramSyncEvent, { type: "done" }>;
+type PublishSync = (event: InstagramSyncEvent) => void;
+
+function flattenComments(
+  mediaId: string,
+  comments: IgComment[],
+  parentId: string | null,
+  rows: ImportedComment[],
+) {
   for (const comment of comments) {
-    await upsertComment(userId, {
+    rows.push({
       id: comment.id,
       mediaId,
       parentId,
@@ -85,16 +98,9 @@ async function flattenComments(userId: string, mediaId: string, comments: IgComm
       repliedPrivate: false,
     });
     const replies = comment.replies?.data ?? [];
-    if (replies.length) await flattenComments(userId, mediaId, replies, comment.id);
+    flattenComments(mediaId, replies, comment.id, rows);
   }
 }
-
-export type SyncReport = {
-  media: number;
-  comments: number;
-  commentErrors: string[];
-  rulesRan: number;
-};
 
 async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
   let index = 0;
@@ -107,70 +113,157 @@ async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
   await Promise.all(workers);
 }
 
-export async function syncFromInstagram(user: UserRecord): Promise<SyncReport> {
+async function importComments(userId: string, token: string, mediaId: string): Promise<number> {
+  const response = await listMediaComments(token, mediaId);
+  const comments = response.data ?? [];
+  const rows: ImportedComment[] = [];
+  flattenComments(mediaId, comments, null, rows);
+  await upsertCommentBatch(userId, rows);
+  return comments.length;
+}
+
+export async function syncFromInstagram(
+  user: UserRecord,
+  input: InstagramSyncInput,
+  publish: PublishSync,
+): Promise<SyncComplete> {
+  const report: SyncReport = { media: 0, comments: 0, commentErrors: [], rulesRan: 0 };
+  const mediaId = input.scope === "post" ? input.mediaId : undefined;
   if (user.isDemo || isDemoMode()) {
     await ensureDemoData();
-    const comments = await listComments(user.id);
-    return { media: 0, comments: comments.length, commentErrors: [], rulesRan: 0 };
+    if (mediaId && !(await getMedia(user.id, mediaId))) throw new Error("not_found");
+    if (input.scope === "posts") {
+      const media = await listMedia(user.id);
+      publish({ type: "media", media });
+      return { type: "done", report: { ...report, media: media.length } };
+    }
+    const comments = await listComments(user.id, { mediaId });
+    return {
+      type: "done",
+      report: { ...report, comments: comments.length },
+      comments,
+    };
   }
+
   const token = plainToken(user);
   if (!token) throw new Error("token_expired");
+
+  if (mediaId) {
+    if (!(await getMedia(user.id, mediaId))) throw new Error("not_found");
+    publish({ type: "progress", label: "Instagram 댓글 가져오는 중" });
+    report.comments = await importComments(user.id, token, mediaId);
+    report.media = 1;
+    publish({
+      type: "progress",
+      label: "댓글 목록 정리 중",
+      detail: `댓글 ${report.comments}개 확인`,
+      value: 75,
+    });
+    return {
+      type: "done",
+      report,
+      comments: await listComments(user.id, { mediaId }),
+    };
+  }
+
+  publish({ type: "progress", label: "Instagram 게시물 확인 중" });
   const page = await listMyMedia(token);
-  const media = page.data ?? [];
-  for (const item of media) {
-    await upsertMedia(user.id, {
+  const media: MediaItem[] = (page.data ?? []).map((item) => {
+    const mediaType = item.media_type ?? "IMAGE";
+    const isVideo = mediaType === "REELS" || mediaType === "VIDEO";
+    return {
       id: item.id,
       caption: item.caption ?? null,
-      mediaType: item.media_type ?? "IMAGE",
+      mediaType,
       mediaUrl: item.media_url ?? null,
-      thumbnailUrl: item.thumbnail_url ?? item.media_url ?? null,
+      thumbnailUrl: item.thumbnail_url ?? (isVideo ? null : (item.media_url ?? null)),
       permalink: item.permalink ?? null,
       timestamp: item.timestamp ?? null,
       likeCount: item.like_count ?? null,
       commentsCount: item.comments_count ?? null,
-    });
+    };
+  });
+  publish({
+    type: "progress",
+    label: "게시물 목록 정리 중",
+    detail: `게시물 ${media.length}개 확인`,
+    value: input.scope === "posts" ? 50 : 15,
+  });
+  await upsertMediaBatch(user.id, media);
+  report.media = media.length;
+
+  if (input.scope === "posts") {
+    publish({ type: "progress", label: "게시물 화면에 반영 중", value: 75 });
+    publish({ type: "media", media: await listMedia(user.id) });
+    return { type: "done", report };
   }
 
-  const commentErrors: string[] = [];
-  let commentCount = 0;
-  await mapPool(media, 4, async (item) => {
-    if (item.comments_count === 0) return;
+  const postsWithComments = media.filter((item) => item.commentsCount !== 0);
+  const postCount = postsWithComments.length;
+  let checked = 0;
+  if (postCount) {
+    publish({
+      type: "progress",
+      label: "Instagram 댓글 가져오는 중",
+      detail: `게시물 0 / ${postCount}`,
+      value: 25,
+    });
+  }
+  await mapPool(postsWithComments, 4, async (item) => {
     try {
-      const comments = await listMediaComments(token, item.id);
-      const rows = comments.data ?? [];
-      commentCount += rows.length;
-      await flattenComments(user.id, item.id, rows, null);
+      const imported = await importComments(user.id, token, item.id);
+      report.comments += imported;
     } catch (error) {
       const message = koreanError(error);
-      commentErrors.push(message);
+      report.commentErrors.push(message);
       await addLog({
         userId: user.id,
         type: "ERROR",
         success: false,
         mediaId: item.id,
-        message: `댓글을 불러오지 못했습니다. ${error instanceof Error ? error.message.slice(0, 180) : ""}`,
+        message: `댓글을 불러오지 못했습니다. ${message}`,
         meta: graphErrorPayload(error),
       });
     }
+    checked += 1;
+    publish({
+      type: "progress",
+      label: "Instagram 댓글 가져오는 중",
+      detail: `게시물 ${checked} / ${postCount}`,
+      value: 25 + Math.floor((50 * checked) / postCount),
+    });
   });
 
-  const rulesRan = await processUnprocessedComments(user);
-  return { media: media.length, comments: commentCount, commentErrors, rulesRan };
+  publish({ type: "progress", label: "댓글 자동화 확인 중", value: 78 });
+  let lastRuleProgress = 77;
+  report.rulesRan = await processUnprocessedComments(user, (checked, total) => {
+    const value = 78 + Math.floor((17 * checked) / total);
+    if (value === lastRuleProgress) return;
+    lastRuleProgress = value;
+    publish({
+      type: "progress",
+      label: "댓글 자동화 확인 중",
+      detail: `댓글 ${checked} / ${total}`,
+      value,
+    });
+  });
+  return { type: "done", report, comments: await listComments(user.id) };
 }
 
-export async function processUnprocessedComments(user: UserRecord): Promise<number> {
-  const comments = await listComments(user.id);
-  const cutoff = Date.now() - PRIVATE_REPLY_WINDOW_MS;
+export async function processUnprocessedComments(
+  user: UserRecord,
+  onProgress?: (checked: number, total: number) => void,
+): Promise<number> {
+  const comments = await listComments(user.id, {
+    unprocessedSince: new Date(Date.now() - PRIVATE_REPLY_WINDOW_MS).toISOString(),
+  });
+  if (!comments.length) return 0;
+  const rules = await listRules(user.id);
   let ran = 0;
   for (const comment of comments) {
-    if (comment.parentId) continue;
-    if (comment.automationProcessedAt) continue;
-    if (comment.timestamp) {
-      const at = new Date(comment.timestamp).getTime();
-      if (!Number.isNaN(at) && at < cutoff) continue;
-    }
-    await executeRuleOnComment(user, comment, false);
+    await executeRuleOnComment(user, comment, false, rules);
     ran += 1;
+    onProgress?.(ran, comments.length);
   }
   return ran;
 }
@@ -286,9 +379,14 @@ export async function removeComment(user: UserRecord, commentId: string) {
   });
 }
 
-export async function executeRuleOnComment(user: UserRecord, comment: CommentItem, force = false) {
+export async function executeRuleOnComment(
+  user: UserRecord,
+  comment: CommentItem,
+  force = false,
+  availableRules?: RuleItem[],
+) {
   if (comment.automationProcessedAt && !force) return { skipped: "already" as const };
-  const rules = await listRules(user.id);
+  const rules = availableRules ?? (await listRules(user.id));
   const preview = matchRule(rules, comment, { igUserId: user.igUserId, username: user.username });
   if (preview.skippedSelf) return { skipped: "self" as const };
   if (!preview.rule) {
@@ -364,9 +462,10 @@ export async function executeRuleOnComment(user: UserRecord, comment: CommentIte
       });
       if (!comment.repliedPrivate) {
         try {
-          await privateReply(user, comment.id, copy.followerAsk, {
-            quickReply: { title: copy.followerButton, payload: followGatePayload(gateId) },
-            logMessage: "안내 받기 버튼을 보냈습니다.",
+          const { openingMessage, buttonLabel } = getFollowerMessages(rule);
+          await privateReply(user, comment.id, openingMessage, {
+            quickReply: { title: buttonLabel, payload: followGatePayload(gateId) },
+            logMessage: "팔로우 확인 버튼을 보냈습니다.",
           });
         } catch (error) {
           await addLog({
@@ -515,13 +614,20 @@ export async function ingestWebhookMessage(event: {
     return;
   }
 
+  const rules = new Map((await listRules(user.id)).map((rule) => [rule.id, rule]));
   for (const gate of targets) {
+    const rule = rules.get(gate.ruleId);
+    if (!rule?.enabled) {
+      if (await claimFollowGate(gate.id, user.id)) await finishFollowGate(gate.id, "skipped");
+      continue;
+    }
     if (profile.status === "not_follower") {
       const reminded = await claimFollowReminder(gate.id);
       if (!reminded) continue;
       try {
-        await sendDirectMessage(token, user.igUserId, event.senderId, copy.followerRemind, {
-          title: copy.followerButton,
+        const { reminderMessage, buttonLabel } = getFollowerMessages(rule);
+        await sendDirectMessage(token, user.igUserId, event.senderId, reminderMessage, {
+          title: buttonLabel,
           payload: followGatePayload(gate.id),
         });
       } catch (error) {
@@ -548,11 +654,6 @@ export async function ingestWebhookMessage(event: {
 
     const claimed = await claimFollowGate(gate.id, user.id);
     if (!claimed) continue;
-    const rule = (await listRules(user.id)).find((item) => item.id === gate.ruleId);
-    if (!rule?.enabled) {
-      await finishFollowGate(gate.id, "skipped");
-      continue;
-    }
     const comment = await getComment(user.id, gate.commentId);
     let delivered = false;
     const publicText = pickPublicReply(rule);

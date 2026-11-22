@@ -16,6 +16,7 @@ import { RuleSimulator } from "@/components/rule-simulator";
 import { copy } from "@/lib/hypeup/copy";
 import { deleteRuleFn, getAutomations, saveRuleFn } from "@/lib/hypeup/api";
 import type { RuleItem } from "@/lib/hypeup/types";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/automations")({
   loader: () => getAutomations(),
@@ -207,7 +208,7 @@ function AutomationsPage() {
         <Dialog.Portal>
           <Dialog.Overlay className="lens-overlay" />
           <Dialog.Content
-            className="lens-sheet fixed inset-x-0 bottom-0 z-[55] max-h-[calc(100dvh_-_max(1rem,env(safe-area-inset-top)))] overflow-y-auto overscroll-contain rounded-b-none bg-surface outline-none sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[calc(100dvh-3rem)] sm:w-[min(calc(100%_-_3rem),36rem)] sm:rounded-xl"
+            className="lens-sheet fixed inset-x-0 bottom-0 z-[55] flex h-[calc(100dvh_-_max(0.75rem,env(safe-area-inset-top)))] min-h-0 flex-col overflow-hidden rounded-b-none bg-surface outline-none sm:inset-0 sm:m-auto sm:h-[min(46rem,calc(100dvh_-_3rem))] sm:w-[min(calc(100%_-_3rem),44rem)] sm:rounded-xl"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               heading.current?.focus({ preventScroll: true });
@@ -220,17 +221,36 @@ function AutomationsPage() {
               target?.focus({ preventScroll: true });
             }}
           >
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-surface p-4 sm:px-6">
-              <div>
-                <Dialog.Title
-                  ref={heading}
-                  tabIndex={-1}
-                  className="text-2xl font-bold tracking-tight outline-none"
-                >
-                  {editor.rule ? "룰 수정" : "새 자동화 룰"}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1 text-sm text-muted">
-                  어떤 댓글에 어떻게 응답할지 설정하세요.
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border bg-surface px-4 py-3.5 sm:px-6 sm:py-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <Dialog.Title
+                    ref={heading}
+                    tabIndex={-1}
+                    className="text-2xl font-bold tracking-tight outline-none"
+                  >
+                    {editor.rule ? "룰 수정" : "새 자동화 룰"}
+                  </Dialog.Title>
+                  {editor.rule ? (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-medium",
+                        editor.rule.enabled
+                          ? "bg-accent-soft text-accent-ink"
+                          : "bg-surface-2 text-muted",
+                      )}
+                    >
+                      <span
+                        className="size-1.5 rounded-full bg-current"
+                        aria-hidden
+                      />
+                      {editor.rule.enabled ? "사용 중" : "일시정지"}
+                    </span>
+                  ) : null}
+                </div>
+                <Dialog.Description className="mt-1 truncate text-sm text-muted">
+                  {editor.rule?.name ??
+                    "어떤 댓글에 어떻게 응답할지 설정하세요."}
                 </Dialog.Description>
               </div>
               <Dialog.Close
@@ -241,6 +261,7 @@ function AutomationsPage() {
               </Dialog.Close>
             </div>
             <RuleForm
+              key={editor.rule?.id ?? "new"}
               initial={editor.rule}
               media={media}
               onCancel={closeEditor}

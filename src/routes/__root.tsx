@@ -10,7 +10,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PwaInstallProvider } from "@/components/pwa-install";
 import { PwaServiceWorker } from "@/components/pwa-service-worker";
 import { initializeLensTheme } from "@/components/lens-theme";
-import { RouteProgress } from "@/components/route-progress";
+import { TaskProgressProvider } from "@/components/route-progress";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Lens";
@@ -65,8 +65,9 @@ export const Route = createRootRoute({
         <AuthProvider>
           <PwaInstallProvider>
             <PwaServiceWorker />
-            <RouteProgress />
-            <Outlet />
+            <TaskProgressProvider>
+              <Outlet />
+            </TaskProgressProvider>
           </PwaInstallProvider>
         </AuthProvider>
         <Scripts />

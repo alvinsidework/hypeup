@@ -13,6 +13,7 @@ import {
   MessageCircle,
   ScrollText,
   Settings,
+  UsersRound,
   X,
   Zap,
 } from "lucide-react";
@@ -33,6 +34,7 @@ const NAV_GROUPS = [
       { to: "/", label: "홈", icon: House },
       { to: "/posts", label: copy.nav.posts, icon: LayoutGrid },
       { to: "/inbox", label: "댓글 인박스", icon: Inbox },
+      { to: "/contacts", label: "상호작용 계정", icon: UsersRound },
       { to: "/automations", label: copy.nav.automations, icon: Zap },
       { to: "/logs", label: "활동 로그", icon: ScrollText },
     ],

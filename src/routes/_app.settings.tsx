@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { LensConfirm } from "@/components/lens-confirm";
 import { LensTheme } from "@/components/lens-theme";
+import { useTaskProgress } from "@/components/route-progress";
 import { Field, inputClass, primaryBtn } from "@/components/lens-ui";
 import { copy } from "@/lib/hypeup/copy";
 import { disconnectFn, resubscribeFn } from "@/lib/hypeup/api";
@@ -21,8 +22,10 @@ function SettingsPage() {
   const days = daysUntil(user.tokenExpiresAt);
   const [subscribing, setSubscribing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const startProgress = useTaskProgress();
 
   async function resubscribe() {
+    const progress = startProgress({ label: "Instagram 실시간 수신 연결 중" });
     setSubscribing(true);
     try {
       const result = await resubscribeFn();
@@ -33,6 +36,7 @@ function SettingsPage() {
     } catch {
       toast.error(copy.genericError);
     } finally {
+      progress.finish();
       setSubscribing(false);
     }
   }

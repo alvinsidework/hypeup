@@ -16,6 +16,14 @@ export class InstagramApiError extends Error {
   }
 }
 
+export function isGraphFieldError(error: unknown): boolean {
+  return (
+    error instanceof InstagramApiError &&
+    error.status === 400 &&
+    /\b(?:nonexisting field|nonexistent field|unknown field|cannot query field|unsupported field)\b/i.test(error.message)
+  );
+}
+
 export function koreanError(error: unknown): string {
   if (error instanceof InstagramApiError) {
     if (error.status === 429 || error.code === 4 || error.code === 32) return copy.rateLimited;

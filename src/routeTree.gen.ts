@@ -18,6 +18,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as UsernameInquiryRouteImport } from './routes/$username_.inquiry'
 import { Route as AppAutomationsRouteImport } from './routes/_app.automations'
+import { Route as AppContactsRouteImport } from './routes/_app.contacts'
 import { Route as AppInboxRouteImport } from './routes/_app.inbox'
 import { Route as AppInquiriesRouteImport } from './routes/_app.inquiries'
 import { Route as AppLogsRouteImport } from './routes/_app.logs'
@@ -34,6 +35,7 @@ import { Route as AppPostsIdRouteImport } from './routes/_app.posts.$id'
 import { Route as ApiAuthInstagramRouteImport } from './routes/api/auth/instagram'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiCronRefreshTokensRouteImport } from './routes/api/cron/refresh-tokens'
+import { Route as ApiInstagramSyncRouteImport } from './routes/api/instagram/sync'
 import { Route as ApiWebhooksInstagramRouteImport } from './routes/api/webhooks/instagram'
 import { Route as ApiAuthInstagramCallbackRouteImport } from './routes/api/auth/instagram.callback'
 import { Route as ApiAuthInstagramHandoffRouteImport } from './routes/api/auth/instagram.handoff'
@@ -80,6 +82,11 @@ const UsernameInquiryRoute = UsernameInquiryRouteImport.update({
 const AppAutomationsRoute = AppAutomationsRouteImport.update({
   id: '/automations',
   path: '/automations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContactsRoute = AppContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInboxRoute = AppInboxRouteImport.update({
@@ -162,6 +169,11 @@ const ApiCronRefreshTokensRoute = ApiCronRefreshTokensRouteImport.update({
   path: '/api/cron/refresh-tokens',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInstagramSyncRoute = ApiInstagramSyncRouteImport.update({
+  id: '/api/instagram/sync',
+  path: '/api/instagram/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWebhooksInstagramRoute = ApiWebhooksInstagramRouteImport.update({
   id: '/api/webhooks/instagram',
   path: '/api/webhooks/instagram',
@@ -188,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/$username/inquiry': typeof UsernameInquiryRoute
   '/automations': typeof AppAutomationsRoute
+  '/contacts': typeof AppContactsRoute
   '/inbox': typeof AppInboxRoute
   '/inquiries': typeof AppInquiriesRouteWithChildren
   '/logs': typeof AppLogsRoute
@@ -202,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
+  '/api/instagram/sync': typeof ApiInstagramSyncRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
   '/inquiries/': typeof AppInquiriesIndexRoute
   '/posts/': typeof AppPostsIndexRoute
@@ -217,6 +231,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/$username/inquiry': typeof UsernameInquiryRoute
   '/automations': typeof AppAutomationsRoute
+  '/contacts': typeof AppContactsRoute
   '/inbox': typeof AppInboxRoute
   '/logs': typeof AppLogsRoute
   '/page': typeof AppPageRoute
@@ -229,6 +244,7 @@ export interface FileRoutesByTo {
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
+  '/api/instagram/sync': typeof ApiInstagramSyncRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
   '/inquiries': typeof AppInquiriesIndexRoute
   '/posts': typeof AppPostsIndexRoute
@@ -246,6 +262,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/$username_/inquiry': typeof UsernameInquiryRoute
   '/_app/automations': typeof AppAutomationsRoute
+  '/_app/contacts': typeof AppContactsRoute
   '/_app/inbox': typeof AppInboxRoute
   '/_app/inquiries': typeof AppInquiriesRouteWithChildren
   '/_app/logs': typeof AppLogsRoute
@@ -260,6 +277,7 @@ export interface FileRoutesById {
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
+  '/api/instagram/sync': typeof ApiInstagramSyncRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
   '/_app/inquiries/': typeof AppInquiriesIndexRoute
   '/_app/posts/': typeof AppPostsIndexRoute
@@ -277,6 +295,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/$username/inquiry'
     | '/automations'
+    | '/contacts'
     | '/inbox'
     | '/inquiries'
     | '/logs'
@@ -291,6 +310,7 @@ export interface FileRouteTypes {
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
+    | '/api/instagram/sync'
     | '/api/webhooks/instagram'
     | '/inquiries/'
     | '/posts/'
@@ -306,6 +326,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/$username/inquiry'
     | '/automations'
+    | '/contacts'
     | '/inbox'
     | '/logs'
     | '/page'
@@ -318,6 +339,7 @@ export interface FileRouteTypes {
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
+    | '/api/instagram/sync'
     | '/api/webhooks/instagram'
     | '/inquiries'
     | '/posts'
@@ -334,6 +356,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/$username_/inquiry'
     | '/_app/automations'
+    | '/_app/contacts'
     | '/_app/inbox'
     | '/_app/inquiries'
     | '/_app/logs'
@@ -348,6 +371,7 @@ export interface FileRouteTypes {
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
+    | '/api/instagram/sync'
     | '/api/webhooks/instagram'
     | '/_app/inquiries/'
     | '/_app/posts/'
@@ -367,6 +391,7 @@ export interface RootRouteChildren {
   ApiAuthInstagramRoute: typeof ApiAuthInstagramRouteWithChildren
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiCronRefreshTokensRoute: typeof ApiCronRefreshTokensRoute
+  ApiInstagramSyncRoute: typeof ApiInstagramSyncRoute
   ApiWebhooksInstagramRoute: typeof ApiWebhooksInstagramRoute
 }
 
@@ -433,6 +458,13 @@ declare module '@tanstack/react-router' {
       path: '/automations'
       fullPath: '/automations'
       preLoaderRoute: typeof AppAutomationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/contacts': {
+      id: '/_app/contacts'
+      path: '/contacts'
+      fullPath: '/contacts'
+      preLoaderRoute: typeof AppContactsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/inbox': {
@@ -547,6 +579,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronRefreshTokensRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/instagram/sync': {
+      id: '/api/instagram/sync'
+      path: '/api/instagram/sync'
+      fullPath: '/api/instagram/sync'
+      preLoaderRoute: typeof ApiInstagramSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/webhooks/instagram': {
       id: '/api/webhooks/instagram'
       path: '/api/webhooks/instagram'
@@ -601,6 +640,7 @@ const AppPostsRouteWithChildren = AppPostsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppAutomationsRoute: typeof AppAutomationsRoute
+  AppContactsRoute: typeof AppContactsRoute
   AppInboxRoute: typeof AppInboxRoute
   AppInquiriesRoute: typeof AppInquiriesRouteWithChildren
   AppLogsRoute: typeof AppLogsRoute
@@ -614,6 +654,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAutomationsRoute: AppAutomationsRoute,
+  AppContactsRoute: AppContactsRoute,
   AppInboxRoute: AppInboxRoute,
   AppInquiriesRoute: AppInquiriesRouteWithChildren,
   AppLogsRoute: AppLogsRoute,
@@ -652,6 +693,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthInstagramRoute: ApiAuthInstagramRouteWithChildren,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiCronRefreshTokensRoute: ApiCronRefreshTokensRoute,
+  ApiInstagramSyncRoute: ApiInstagramSyncRoute,
   ApiWebhooksInstagramRoute: ApiWebhooksInstagramRoute,
 }
 export const routeTree = rootRouteImport

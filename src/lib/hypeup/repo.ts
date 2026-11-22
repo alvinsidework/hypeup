@@ -69,6 +69,9 @@ type RuleRow = {
   dm_message: string | null;
   hide_comment: boolean;
   followers_only?: boolean;
+  follow_opening_message?: string | null;
+  follow_reminder_message?: string | null;
+  follow_button_label?: string | null;
   sort_order: number;
   updated_at: string | Date;
 };
@@ -180,6 +183,9 @@ function mapRule(row: RuleRow): RuleItem {
     dmMessage: row.dm_message,
     hideComment: asBool(row.hide_comment),
     followersOnly: asBool(row.followers_only),
+    followOpeningMessage: row.follow_opening_message ?? null,
+    followReminderMessage: row.follow_reminder_message ?? null,
+    followButtonLabel: row.follow_button_label ?? null,
     sortOrder: Number(row.sort_order ?? 0),
     updatedAt: asIso(row.updated_at) ?? new Date().toISOString(),
   };
@@ -294,11 +300,27 @@ export async function updateUserToken(
 }
 
 export async function upsertMedia(userId: string, media: MediaItem): Promise<void> {
+  await upsertMediaBatch(userId, [media]);
+}
+
+export async function upsertMediaBatch(
+  userId: string,
+  media: readonly MediaItem[],
+): Promise<void> {
+  if (!media.length) return;
+  const rows = [...new Map(media.map((item) => [item.id, item])).values()];
   const sql = await getSql();
   await sql.query(
     `insert into hypeup_media (
       id, user_id, caption, media_type, media_url, thumbnail_url, permalink, timestamp, like_count, comments_count, updated_at
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+    )
+    select m.id, $1, m.caption, m."mediaType", m."mediaUrl", m."thumbnailUrl", m.permalink,
+      m.timestamp, m."likeCount", m."commentsCount", now()
+    from jsonb_to_recordset($2::jsonb) as m(
+      id text, caption text, "mediaType" text, "mediaUrl" text, "thumbnailUrl" text, permalink text,
+      timestamp timestamptz, "likeCount" integer, "commentsCount" integer
+    )
+    order by m.id
     on conflict (id) do update set
       caption = excluded.caption,
       media_type = excluded.media_type,
@@ -308,19 +330,9 @@ export async function upsertMedia(userId: string, media: MediaItem): Promise<voi
       timestamp = excluded.timestamp,
       like_count = excluded.like_count,
       comments_count = excluded.comments_count,
-      updated_at = now()`,
-    [
-      media.id,
-      userId,
-      media.caption,
-      media.mediaType,
-      media.mediaUrl,
-      media.thumbnailUrl,
-      media.permalink,
-      media.timestamp,
-      media.likeCount,
-      media.commentsCount,
-    ],
+      updated_at = now()
+    where hypeup_media.user_id = excluded.user_id`,
+    [userId, JSON.stringify(rows)],
   );
 }
 
@@ -342,43 +354,66 @@ export async function getMedia(userId: string, id: string): Promise<MediaItem | 
   return rows[0] ? mapMedia(rows[0]) : null;
 }
 
-export async function upsertComment(
+type CommentWrite = Omit<CommentItem, "media" | "automationProcessedAt"> & {
+  automationProcessedAt?: string | null;
+};
+
+export async function upsertComment(userId: string, comment: CommentWrite): Promise<void> {
+  await upsertCommentBatch(userId, [comment]);
+}
+
+export async function upsertCommentBatch(
   userId: string,
-  comment: Omit<CommentItem, "media" | "automationProcessedAt"> & { automationProcessedAt?: string | null },
+  comments: readonly CommentWrite[],
 ): Promise<void> {
+  if (!comments.length) return;
+  const rows = new Map<string, CommentWrite>();
+  for (const comment of comments) {
+    const previous = rows.get(comment.id);
+    rows.set(
+      comment.id,
+      previous
+        ? {
+            ...previous,
+            text: comment.text,
+            repliedPublic: previous.repliedPublic || comment.repliedPublic,
+            repliedPrivate: previous.repliedPrivate || comment.repliedPrivate,
+            igFromId: comment.igFromId ?? previous.igFromId,
+            igFromUsername: comment.igFromUsername ?? previous.igFromUsername,
+          }
+        : comment,
+    );
+  }
   const sql = await getSql();
   await sql.query(
     `insert into hypeup_comment (
       id, user_id, media_id, parent_id, ig_from_id, ig_from_username, text, timestamp,
       hidden, replied_public, replied_private, automation_processed_at
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+    )
+    select c.id, $1, c."mediaId", c."parentId", c."igFromId", c."igFromUsername", c.text,
+      c.timestamp, c.hidden, c."repliedPublic", c."repliedPrivate", c."automationProcessedAt"
+    from jsonb_to_recordset($2::jsonb) as c(
+      id text, "mediaId" text, "parentId" text, "igFromId" text, "igFromUsername" text,
+      text text, timestamp timestamptz, hidden boolean, "repliedPublic" boolean,
+      "repliedPrivate" boolean, "automationProcessedAt" timestamptz
+    )
+    join hypeup_media m on m.id = c."mediaId" and m.user_id = $1
+    order by c.id
     on conflict (id) do update set
       text = excluded.text,
       hidden = hypeup_comment.hidden,
       replied_public = hypeup_comment.replied_public or excluded.replied_public,
       replied_private = hypeup_comment.replied_private or excluded.replied_private,
       ig_from_id = coalesce(excluded.ig_from_id, hypeup_comment.ig_from_id),
-      ig_from_username = coalesce(excluded.ig_from_username, hypeup_comment.ig_from_username)`,
-    [
-      comment.id,
-      userId,
-      comment.mediaId,
-      comment.parentId,
-      comment.igFromId,
-      comment.igFromUsername,
-      comment.text,
-      comment.timestamp,
-      comment.hidden,
-      comment.repliedPublic,
-      comment.repliedPrivate,
-      comment.automationProcessedAt ?? null,
-    ],
+      ig_from_username = coalesce(excluded.ig_from_username, hypeup_comment.ig_from_username)
+    where hypeup_comment.user_id = excluded.user_id`,
+    [userId, JSON.stringify([...rows.values()])],
   );
 }
 
 export async function listComments(
   userId: string,
-  opts: { mediaId?: string; filter?: string; q?: string } = {},
+  opts: { mediaId?: string; filter?: string; q?: string; unprocessedSince?: string } = {},
 ): Promise<CommentItem[]> {
   const sql = await getSql();
   const params: unknown[] = [userId];
@@ -396,6 +431,11 @@ export async function listComments(
   if (opts.q) {
     params.push(`%${opts.q}%`);
     where.push(`(c.text ilike $${params.length} or coalesce(c.ig_from_username,'') ilike $${params.length})`);
+  }
+  if (opts.unprocessedSince) {
+    params.push(opts.unprocessedSince);
+    where.push(`nullif(c.parent_id, '') is null and c.automation_processed_at is null
+      and (c.timestamp is null or c.timestamp >= $${params.length})`);
   }
   const rows = await sql.query<CommentRow>(
     `select c.*, m.caption as media_caption, m.thumbnail_url as media_thumb, m.media_type
@@ -463,17 +503,27 @@ export async function listRules(userId: string): Promise<RuleItem[]> {
   return rows.map(mapRule);
 }
 
+export async function getRule(userId: string, id: string): Promise<RuleItem | null> {
+  const sql = await getSql();
+  const [row] = await sql.query<RuleRow>(
+    "select * from hypeup_rule where user_id = $1 and id = $2",
+    [userId, id],
+  );
+  return row ? mapRule(row) : null;
+}
+
 export async function saveRule(
   userId: string,
   rule: Omit<RuleItem, "updatedAt" | "id"> & { id?: string },
 ): Promise<RuleItem> {
   const sql = await getSql();
   const id = rule.id && rule.id !== "new" ? rule.id : newId();
-  await sql.query(
+  const [saved] = await sql.query<RuleRow>(
     `insert into hypeup_rule (
       id, user_id, name, enabled, scope, media_id, match_mode, keywords, exclude_keywords,
-      public_replies, dm_message, hide_comment, followers_only, sort_order, updated_at
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
+      public_replies, dm_message, hide_comment, followers_only, sort_order,
+      follow_opening_message, follow_reminder_message, follow_button_label, updated_at
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, now())
     on conflict (id) do update set
       name = excluded.name,
       enabled = excluded.enabled,
@@ -487,7 +537,12 @@ export async function saveRule(
       hide_comment = excluded.hide_comment,
       followers_only = excluded.followers_only,
       sort_order = excluded.sort_order,
-      updated_at = now()`,
+      follow_opening_message = case when $18 then excluded.follow_opening_message else hypeup_rule.follow_opening_message end,
+      follow_reminder_message = case when $19 then excluded.follow_reminder_message else hypeup_rule.follow_reminder_message end,
+      follow_button_label = case when $20 then excluded.follow_button_label else hypeup_rule.follow_button_label end,
+      updated_at = now()
+    where hypeup_rule.user_id = excluded.user_id
+    returning *`,
     [
       id,
       userId,
@@ -503,11 +558,16 @@ export async function saveRule(
       rule.hideComment,
       rule.followersOnly,
       rule.sortOrder,
+      rule.followOpeningMessage ?? null,
+      rule.followReminderMessage ?? null,
+      rule.followButtonLabel ?? null,
+      rule.followOpeningMessage !== undefined,
+      rule.followReminderMessage !== undefined,
+      rule.followButtonLabel !== undefined,
     ],
   );
-  const rows = await sql.query<RuleRow>("select * from hypeup_rule where id = $1", [id]);
-  if (!rows[0]) throw new Error("Failed to save rule");
-  return mapRule(rows[0]);
+  if (!saved) throw new Error("Failed to save rule");
+  return mapRule(saved);
 }
 
 export type FollowGateRecord = {

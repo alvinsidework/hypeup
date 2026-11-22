@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { ImageIcon, MessageCircle, Play } from "lucide-react";
+import { MessageCircle } from "lucide-react";
+import { MediaPlaceholder, MediaPreview } from "@/components/media-preview";
 import type { MediaItem } from "@/lib/hypeup/types";
 
 const MEDIA_LABELS: Record<string, string> = {
@@ -9,14 +10,34 @@ const MEDIA_LABELS: Record<string, string> = {
   REELS: "릴스",
 };
 
+const gridClass = "grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4";
+
 export function mediaTypeLabel(type: string) {
   return MEDIA_LABELS[type] ?? type;
 }
 
+export function MediaGridSkeleton() {
+  return (
+    <div className={gridClass} aria-hidden>
+      {Array.from({ length: 8 }, (_, index) => (
+        <div key={index} className="lens-panel overflow-hidden">
+          <div className="relative aspect-square motion-safe:animate-pulse">
+            <MediaPlaceholder crossed />
+          </div>
+          <div className="space-y-2 px-3.5 py-3.5 motion-safe:animate-pulse">
+            <div className="h-[14px] w-3/4 rounded-full bg-surface-2" />
+            <div className="h-3.5 w-2/5 rounded-full bg-surface-2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function MediaGrid({ media }: { media: MediaItem[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-      {media.map((item) => (
+    <div className={gridClass}>
+      {media.map((item, index) => (
         <Link
           key={item.id}
           to="/posts/$id"
@@ -24,28 +45,7 @@ export function MediaGrid({ media }: { media: MediaItem[] }) {
           preload="intent"
           className="lens-panel group min-w-0 overflow-hidden transition-[border-color,transform] duration-200 hover:border-accent motion-safe:active:scale-[.98]"
         >
-          <div className="relative aspect-square bg-surface-2">
-            {item.thumbnailUrl ? (
-              <img
-                src={item.thumbnailUrl}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="size-full object-cover transition-transform duration-200 motion-safe:group-hover:scale-[1.025]"
-              />
-            ) : (
-              <div
-                className="grid size-full place-items-center text-muted"
-                aria-hidden
-              >
-                {item.mediaType === "REELS" || item.mediaType === "VIDEO" ? (
-                  <Play className="size-6" strokeWidth={1.6} />
-                ) : (
-                  <ImageIcon className="size-6" strokeWidth={1.6} />
-                )}
-              </div>
-            )}
-          </div>
+          <MediaPreview media={item} eager={index < 2} />
           <div className="px-3.5 py-3">
             <p className="truncate text-sm font-semibold">
               {item.caption || "캡션 없음"}

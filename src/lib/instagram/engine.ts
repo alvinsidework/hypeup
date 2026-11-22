@@ -31,8 +31,8 @@ export type MatchRule = Pick<
   | "updatedAt"
 >;
 
-export type MatchPreview = {
-  rule: MatchRule | null;
+export type MatchPreview<Rule extends MatchRule = MatchRule> = {
+  rule: Rule | null;
   skippedSelf: boolean;
   skippedInvalidRegex: boolean;
   publicReply: string | null;
@@ -86,7 +86,7 @@ function isSelfComment(comment: MatchComment, self: MatchSelf) {
   return false;
 }
 
-export function sortRules(rules: MatchRule[]): MatchRule[] {
+export function sortRules<Rule extends MatchRule>(rules: Rule[]): Rule[] {
   return [...rules].sort((a, b) => {
     if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
     return b.updatedAt.localeCompare(a.updatedAt);
@@ -99,11 +99,11 @@ export function pickPublicReply(rule: MatchRule, random = Math.random): string |
   return rule.publicReplies[index] ?? rule.publicReplies[0] ?? null;
 }
 
-export function matchRule(
-  rules: MatchRule[],
+export function matchRule<Rule extends MatchRule>(
+  rules: Rule[],
   comment: MatchComment,
   self: MatchSelf,
-): MatchPreview {
+): MatchPreview<Rule> {
   if (isSelfComment(comment, self)) {
     return {
       rule: null,

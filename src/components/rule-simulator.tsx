@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { Field, inputClass } from "@/components/lens-ui";
+import { getFollowerMessages } from "@/lib/hypeup/rule-messages";
 import { matchRule } from "@/lib/instagram/engine";
 import type { MediaItem, RuleItem } from "@/lib/hypeup/types";
 
@@ -33,6 +34,9 @@ export function RuleSimulator({
     [rules, text, mediaId, igUserId, username],
   );
   const matched = preview.rule;
+  const followerRule = matched?.followersOnly
+    ? rules.find((rule) => rule.id === matched.id)
+    : undefined;
 
   return (
     <section className="lens-panel p-4 sm:p-5">
@@ -87,9 +91,10 @@ export function RuleSimulator({
                 실제 발송 시 등록된 대댓글 중 하나를 골라 보냅니다.
               </p>
             ) : null}
-            {matched.followersOnly ? (
+            {followerRule ? (
               <p className="mt-2 text-muted">
-                확인된 팔로워에게 바로 보내고, 그 외에는 ‘안내 받기’ 버튼 뒤에
+                확인된 팔로워에게 바로 보내고, 처음 보는 방문자는 ‘
+                {getFollowerMessages(followerRule).buttonLabel}’ 버튼을 누른 뒤
                 확인합니다.
               </p>
             ) : null}

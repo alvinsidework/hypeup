@@ -1,4 +1,5 @@
 import { graphGet } from "./client";
+import { isGraphFieldError } from "./errors";
 import type { GraphList, IgMedia } from "./types";
 
 export async function listMyMedia(token: string, after?: string): Promise<GraphList<IgMedia>> {
@@ -9,7 +10,8 @@ export async function listMyMedia(token: string, after?: string): Promise<GraphL
   if (after) search.after = after;
   try {
     return await graphGet<GraphList<IgMedia>>(token, "/me/media", search);
-  } catch {
+  } catch (error) {
+    if (!isGraphFieldError(error)) throw error;
     return graphGet<GraphList<IgMedia>>(token, "/me/media", {
       fields: "id,caption,media_type,media_url,permalink,timestamp",
       limit: "25",

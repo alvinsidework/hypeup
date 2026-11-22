@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const filters = [
   ["all", "전체"],
   ["unreplied", "미답글"],
+  ["dm-sent", "DM 발송"],
   ["hidden", "숨김"],
 ] as const;
 
@@ -48,6 +49,7 @@ export function InboxView({
       (comment.repliedPublic || comment.repliedPrivate)
     )
       return false;
+    if (filter === "dm-sent" && !comment.repliedPrivate) return false;
     if (filter === "hidden" && !comment.hidden) return false;
     return (
       !search ||
@@ -104,6 +106,11 @@ export function InboxView({
             />
           </label>
         </div>
+        {filter === "dm-sent" ? (
+          <p className="text-sm text-muted">
+            댓글에서 보낸 DM을 모아 봅니다. 팔로우 안내도 포함돼요.
+          </p>
+        ) : null}
         {filtered.length === 0 ? (
           <EmptyState
             title={

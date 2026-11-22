@@ -66,6 +66,9 @@ export type RuleItem = {
   dmMessage: string | null;
   hideComment: boolean;
   followersOnly: boolean;
+  followOpeningMessage?: string | null;
+  followReminderMessage?: string | null;
+  followButtonLabel?: string | null;
   sortOrder: number;
   updatedAt: string;
 };

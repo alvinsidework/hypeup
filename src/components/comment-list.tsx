@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { MediaPreview } from "@/components/media-preview";
 import { initial, relativeTime } from "@/lib/hypeup/format";
 import type { CommentItem } from "@/lib/hypeup/types";
 import { cn } from "@/lib/utils";
@@ -64,13 +65,12 @@ export function CommentList({
               </span>
             </span>
             {comment.media?.thumbnailUrl ? (
-              <img
-                src={comment.media.thumbnailUrl}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="size-11 shrink-0 rounded-sm object-cover"
-              />
+              <span aria-hidden className="size-11 shrink-0">
+                <MediaPreview
+                  media={{ ...comment.media, mediaUrl: null }}
+                  className="rounded-sm"
+                />
+              </span>
             ) : null}
             <ChevronRight
               aria-hidden

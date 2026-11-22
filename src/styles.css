@@ -264,11 +264,87 @@
     transform: translate3d(calc(-1 * var(--lens-drawer-width)), 0, 0);
   }
 
-  .lens-route-progress {
-    animation:
-      lens-progress-in 180ms ease both,
-      lens-progress-grow 1.3s ease-out both;
-    animation-delay: 180ms;
+  .lens-progress-position {
+    position: fixed;
+    z-index: 45;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: max(16px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      max(16px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+    pointer-events: none;
+  }
+
+  .lens-progress-card {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    max-width: min(100%, 23rem);
+    padding: 12px 19px 12px 13px;
+    border: 1px solid var(--color-border);
+    border-radius: 22px;
+    background-color: var(--color-surface);
+    color: var(--color-fg);
+    box-shadow: var(--lens-shadow);
+    animation: lens-progress-in var(--lens-motion) var(--lens-ease) both;
+  }
+
+  .lens-progress-position[data-finishing] .lens-progress-card {
+    animation: lens-progress-out var(--lens-motion) ease both;
+  }
+
+  .lens-progress-position[data-finishing="complete"] .lens-progress-card {
+    animation-delay: 200ms;
+  }
+
+  .lens-progress-position[data-finishing="complete"] .lens-progress-arc {
+    transition-duration: 170ms;
+  }
+
+  .lens-progress-copy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .lens-progress-ring {
+    position: relative;
+    flex: 0 0 auto;
+    width: 56px;
+    height: 56px;
+  }
+
+  .lens-progress-ring svg {
+    display: block;
+    width: 100%;
+  }
+
+  .lens-progress-track {
+    stroke: var(--color-surface-2);
+    stroke-width: 4px;
+  }
+
+  .lens-progress-arc {
+    stroke: var(--color-accent);
+    stroke-width: 4px;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 360ms var(--lens-ease);
+  }
+
+  .lens-progress-orbit {
+    animation: lens-progress-orbit 1.15s linear infinite;
+  }
+
+  .lens-progress-value {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--color-accent-ink);
+    font-size: 14px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -333,18 +409,28 @@
 @keyframes lens-progress-in {
   from {
     opacity: 0;
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@keyframes lens-progress-grow {
+@keyframes lens-progress-out {
   from {
-    transform: scaleX(0.03);
+    opacity: 1;
+    transform: translateY(0);
   }
   to {
-    transform: scaleX(0.85);
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes lens-progress-orbit {
+  to {
+    transform: rotate(1turn);
   }
 }
 

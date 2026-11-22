@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent } from "react";
 import { Eye, EyeOff, LoaderCircle, Send, Trash2, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { LensConfirm } from "@/components/lens-confirm";
+import { useTaskProgress } from "@/components/route-progress";
 import { copy } from "@/lib/hypeup/copy";
 import { initial, relativeTime } from "@/lib/hypeup/format";
 import {
@@ -15,6 +16,14 @@ import type { CommentItem } from "@/lib/hypeup/types";
 import { cn } from "@/lib/utils";
 
 type Channel = "reply" | "dm";
+
+const actionProgress = {
+  reply: "답글 보내는 중",
+  dm: "DM 보내는 중",
+  hide: "댓글 표시 상태 변경 중",
+  delete: "댓글 삭제 중",
+  rule: "자동화 실행 중",
+} as const;
 
 const channels: [Channel, string][] = [
   ["reply", "공개 답글"],
@@ -36,16 +45,18 @@ export function CommentThread({
   const [channel, setChannel] = useState<Channel>("reply");
   const [drafts, setDrafts] = useState({ reply: "", dm: "" });
   const [busy, setBusy] = useState<string | null>(null);
+  const startProgress = useTaskProgress();
   const isDm = channel === "dm";
   const hasDm = isDm && comment.repliedPrivate;
   const sendLabel = isDm ? copy.sendDm : copy.replyPublic;
   const commentId = comment.id;
 
   async function run(
-    label: string,
+    label: keyof typeof actionProgress,
     action: () => Promise<{ ok: boolean; error?: string; message?: string }>,
     onSuccess?: () => void,
   ) {
+    const progress = startProgress({ label: actionProgress[label] });
     setBusy(label);
     try {
       const result = await action();
@@ -59,6 +70,7 @@ export function CommentThread({
     } catch {
       toast.error(copy.genericError);
     } finally {
+      progress.finish();
       setBusy(null);
     }
   }

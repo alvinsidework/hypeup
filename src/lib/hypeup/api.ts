@@ -12,7 +12,6 @@ import {
   requireUser,
   resubscribe,
   setHidden,
-  syncFromInstagram,
 } from "./actions.server";
 import { copy } from "./copy";
 import { isDemoMode } from "./env.server";
@@ -20,6 +19,7 @@ import {
   deleteRule,
   getComment,
   getMedia,
+  getRule,
   listComments,
   listLogs,
   listMedia,
@@ -27,10 +27,16 @@ import {
   saveRule,
 } from "./repo";
 import { clearSessionCookie } from "./session.server";
+import { DM_TEXT_LIMIT, dmTextBytes, FOLLOW_BUTTON_LABEL_LIMIT } from "./rule-messages";
 import { koreanError } from "@/lib/instagram/errors";
 import { matchRule } from "@/lib/instagram/engine";
 import type { RuleItem } from "./types";
 export { enterDemo, getBootstrap } from "./bootstrap";
+
+const followerMessage = z.string().trim().refine(
+  (value) => dmTextBytes(value) <= DM_TEXT_LIMIT,
+  "Instagram DM은 최대 1,000바이트까지 보낼 수 있습니다.",
+).nullable().optional();
 
 const ruleSchema = z.object({
   id: z.string().optional(),
@@ -45,6 +51,9 @@ const ruleSchema = z.object({
   dmMessage: z.string().nullable(),
   hideComment: z.boolean(),
   followersOnly: z.boolean().default(false),
+  followOpeningMessage: followerMessage,
+  followReminderMessage: followerMessage,
+  followButtonLabel: z.string().trim().max(FOLLOW_BUTTON_LABEL_LIMIT).nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -73,27 +82,14 @@ export const getPosts = createServerFn({ method: "GET" }).handler(async () => {
   return { media: await listMedia(user.id), demoMode: isDemoMode() };
 });
 
-export const refreshPosts = createServerFn({ method: "POST" }).handler(async () => {
-  const user = await safeUser();
-  try {
-    const report = await syncFromInstagram(user);
-    return {
-      ok: true as const,
-      media: await listMedia(user.id),
-      comments: await listComments(user.id),
-      report,
-    };
-  } catch (error) {
-    return { ok: false as const, error: koreanError(error) };
-  }
-});
-
 export const getPostDetail = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string() }))
   .handler(async ({ data }) => {
     const user = await safeUser();
-    const media = await getMedia(user.id, data.id);
-    const comments = await listComments(user.id, { mediaId: data.id });
+    const [media, comments] = await Promise.all([
+      getMedia(user.id, data.id),
+      listComments(user.id, { mediaId: data.id }),
+    ]);
     return { media, comments };
   });
 
@@ -167,7 +163,8 @@ export const runRuleFn = createServerFn({ method: "POST" })
 
 export const getAutomations = createServerFn({ method: "GET" }).handler(async () => {
   const user = await safeUser();
-  return { rules: await listRules(user.id), media: await listMedia(user.id) };
+  const [rules, media] = await Promise.all([listRules(user.id), listMedia(user.id)]);
+  return { rules, media };
 });
 
 export const saveRuleFn = createServerFn({ method: "POST" })
@@ -176,6 +173,13 @@ export const saveRuleFn = createServerFn({ method: "POST" })
     const user = await safeUser();
     if (data.matchMode !== "ANY" && data.keywords.length === 0) {
       throw new Error("키워드를 입력하세요.");
+    }
+    if (data.dmMessage && dmTextBytes(data.dmMessage) > DM_TEXT_LIMIT) {
+      const previous = data.id ? await getRule(user.id, data.id) : null;
+      // Allow existing oversized messages to be disabled or edited without losing their text.
+      if (previous?.dmMessage?.trim() !== data.dmMessage.trim()) {
+        throw new Error("Instagram DM은 최대 1,000바이트까지 보낼 수 있습니다.");
+      }
     }
     const saved = await saveRule(user.id, {
       name: data.name,
@@ -189,6 +193,9 @@ export const saveRuleFn = createServerFn({ method: "POST" })
       dmMessage: data.dmMessage,
       hideComment: data.hideComment,
       followersOnly: data.followersOnly,
+      followOpeningMessage: data.followOpeningMessage,
+      followReminderMessage: data.followReminderMessage,
+      followButtonLabel: data.followButtonLabel,
       id: data.id,
       sortOrder: data.sortOrder ?? 0,
     });

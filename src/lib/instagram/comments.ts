@@ -1,4 +1,5 @@
 import { graphDelete, graphGet, graphPost } from "./client";
+import { isGraphFieldError } from "./errors";
 import type { GraphList, IgComment } from "./types";
 
 export async function listMediaComments(token: string, mediaId: string): Promise<GraphList<IgComment>> {
@@ -6,7 +7,8 @@ export async function listMediaComments(token: string, mediaId: string): Promise
     return await graphGet<GraphList<IgComment>>(token, `/${mediaId}/comments`, {
       fields: "id,text,username,timestamp,from,replies{id,text,username,timestamp,from}",
     });
-  } catch {
+  } catch (error) {
+    if (!isGraphFieldError(error)) throw error;
     return graphGet<GraphList<IgComment>>(token, `/${mediaId}/comments`, {
       fields: "id,text,timestamp",
     });

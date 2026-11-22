@@ -1,5 +1,5 @@
 export const legal = {
-  appName: "Hypeup",
+  appName: "Lens",
   company: "올인더밸류",
   ceo: "한태우",
   bizNo: "161-17-03047",

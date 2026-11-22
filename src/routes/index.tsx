@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { AccessRequestDialog } from "@/components/access-request-dialog";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -117,6 +117,10 @@ function Overview() {
           <p className="mt-1 text-[13px] tabular-nums text-muted">
             {formatCount(home.user.followersCount)} 팔로워
           </p>
+          <div className="mt-3 flex gap-3 text-[13px]">
+            <Link to="/page" className="underline">공개 페이지</Link>
+            <Link to="/inquiries" className="underline">브랜드 문의</Link>
+          </div>
         </div>
       </div>
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

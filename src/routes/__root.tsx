@@ -3,7 +3,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Hypeup";
+const APP_NAME = "Lens";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#0b0b0c" },
       {
         name: "description",
-        content: "Instagram 프로페셔널 계정 댓글 운영 데스크",
+        content: "Instagram 댓글 운영과 브랜드 문의 기록",
       },
     ],
     links: [

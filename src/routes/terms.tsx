@@ -10,14 +10,16 @@ function TermsPage() {
   return (
     <LegalLayout title="이용약관">
       <p>
-        이 약관은 {legal.company}이 제공하는 Hypeup 서비스의 이용 조건을 정합니다. 시행일: 2026년 9월
+        이 약관은 {legal.company}이 제공하는 {legal.appName} 서비스의 이용 조건을 정합니다. 시행일: 2026년 9월
         19일.
       </p>
       <section>
         <h2 className="mb-2 text-[15px] font-medium text-fg">1. 서비스</h2>
         <p>
-          Hypeup은 Instagram 프로페셔널 계정 운영자가 댓글을 읽고, 키워드 규칙에 따라 공개 대댓글과
-          메시지(DM)를 보내도록 돕는 운영 데스크입니다. 개인 계정은 지원하지 않습니다.
+          {legal.appName}은 Instagram 프로페셔널 계정 운영자가 댓글을 읽고, 키워드 규칙에 따라 공개 대댓글과
+          메시지(DM)를 보내도록 돕는 운영 데스크입니다. 같은 계정으로 공개 페이지와 브랜드 문의 기록을
+          남길 수 있습니다. 정산 화면의 지급 표시는 브랜드가 직접 남긴 선언이며, 서비스가 입금을 확인하지는
+          않습니다. 개인 계정은 지원하지 않습니다.
         </p>
       </section>
       <section>

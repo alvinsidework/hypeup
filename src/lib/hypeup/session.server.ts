@@ -12,6 +12,10 @@ export type SessionPayload = {
 
 const THIRTY_DAYS = 60 * 60 * 24 * 30;
 
+export function sessionSecretKey(): Uint8Array {
+  return secretKey();
+}
+
 function secretKey(): Uint8Array {
   const secret = authSecret();
   if (secret) return new TextEncoder().encode(secret);

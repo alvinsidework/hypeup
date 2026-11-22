@@ -47,7 +47,7 @@ async function sendViaResend(input: {
   replyTo: string;
   apiKey: string;
 }): Promise<void> {
-  const from = env("RESEND_FROM") ?? "Hypeup <onboarding@resend.dev>";
+  const from = env("RESEND_FROM") ?? "Lens <onboarding@resend.dev>";
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {

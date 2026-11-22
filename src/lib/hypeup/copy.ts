@@ -1,11 +1,11 @@
 export const copy = {
-  appName: "Hypeup",
+  appName: "Lens",
   tagline: "인스타그램 댓글과 DM, 손쉽게 자동화하기",
   landingBody:
     "프로페셔널 계정으로 연결하면 설정한 키워드에 맞춰 공개 대댓글과 DM을 보냅니다.",
   connectHeadline: "내 인스타그램으로 대시보드 연결",
   connectBody:
-    "Business Login으로 본인 프로페셔널 계정만 연결합니다. Hypeup은 비밀번호를 받지 않습니다.",
+    "Business Login으로 본인 프로페셔널 계정만 연결합니다. Lens는 비밀번호를 받지 않습니다.",
   professionalHint:
     "개인 계정은 API 대상이 아닙니다. Instagram 설정에서 비즈니스 또는 크리에이터로 전환하세요.",
   continueWithInstagram: "Instagram으로 계속",
@@ -50,6 +50,8 @@ export const copy = {
     automations: "자동화",
     logs: "로그",
     settings: "설정",
+    page: "페이지",
+    inquiries: "문의",
   },
 } as const;
 

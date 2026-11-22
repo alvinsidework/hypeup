@@ -12,7 +12,7 @@ export function LogoMark({ className }: { className?: string }) {
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cn("font-display text-[18px] italic leading-none tracking-tight", className)}>
-      Hypeup
+      Lens
     </span>
   );
 }

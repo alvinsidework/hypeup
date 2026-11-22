@@ -10,16 +10,25 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as UsernameRouteImport } from './routes/$username'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as DataDeletionRouteImport } from './routes/data-deletion'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as UsernameInquiryRouteImport } from './routes/$username_.inquiry'
 import { Route as AppAutomationsRouteImport } from './routes/_app.automations'
 import { Route as AppInboxRouteImport } from './routes/_app.inbox'
+import { Route as AppInquiriesRouteImport } from './routes/_app.inquiries'
 import { Route as AppLogsRouteImport } from './routes/_app.logs'
+import { Route as AppPageRouteImport } from './routes/_app.page'
+import { Route as AppPortfolioRouteImport } from './routes/_app.portfolio'
 import { Route as AppPostsRouteImport } from './routes/_app.posts'
+import { Route as AppRatesRouteImport } from './routes/_app.rates'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppDealsIdRouteImport } from './routes/_app.deals.$id'
+import { Route as AppInquiriesIndexRouteImport } from './routes/_app.inquiries.index'
+import { Route as AppInquiriesIdRouteImport } from './routes/_app.inquiries.$id'
 import { Route as AppPostsIndexRouteImport } from './routes/_app.posts.index'
 import { Route as AppPostsIdRouteImport } from './routes/_app.posts.$id'
 import { Route as ApiAuthInstagramRouteImport } from './routes/api/auth/instagram'
@@ -31,6 +40,11 @@ import { Route as ApiAuthInstagramCallbackRouteImport } from './routes/api/auth/
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UsernameRoute = UsernameRouteImport.update({
+  id: '/$username',
+  path: '/$username',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -57,6 +71,11 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsernameInquiryRoute = UsernameInquiryRouteImport.update({
+  id: '/$username_/inquiry',
+  path: '/$username/inquiry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppAutomationsRoute = AppAutomationsRouteImport.update({
   id: '/automations',
   path: '/automations',
@@ -67,9 +86,24 @@ const AppInboxRoute = AppInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInquiriesRoute = AppInquiriesRouteImport.update({
+  id: '/inquiries',
+  path: '/inquiries',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppLogsRoute = AppLogsRouteImport.update({
   id: '/logs',
   path: '/logs',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPageRoute = AppPageRouteImport.update({
+  id: '/page',
+  path: '/page',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPortfolioRoute = AppPortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPostsRoute = AppPostsRouteImport.update({
@@ -77,10 +111,30 @@ const AppPostsRoute = AppPostsRouteImport.update({
   path: '/posts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRatesRoute = AppRatesRouteImport.update({
+  id: '/rates',
+  path: '/rates',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AppRoute,
+} as any)
+const AppDealsIdRoute = AppDealsIdRouteImport.update({
+  id: '/deals/$id',
+  path: '/deals/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInquiriesIndexRoute = AppInquiriesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppInquiriesRoute,
+} as any)
+const AppInquiriesIdRoute = AppInquiriesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppInquiriesRoute,
 } as any)
 const AppPostsIndexRoute = AppPostsIndexRouteImport.update({
   id: '/',
@@ -121,59 +175,85 @@ const ApiAuthInstagramCallbackRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$username': typeof UsernameRoute
   '/connect': typeof ConnectRoute
   '/data-deletion': typeof DataDeletionRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/$username/inquiry': typeof UsernameInquiryRoute
   '/automations': typeof AppAutomationsRoute
   '/inbox': typeof AppInboxRoute
+  '/inquiries': typeof AppInquiriesRouteWithChildren
   '/logs': typeof AppLogsRoute
+  '/page': typeof AppPageRoute
+  '/portfolio': typeof AppPortfolioRoute
   '/posts': typeof AppPostsRouteWithChildren
+  '/rates': typeof AppRatesRoute
   '/settings': typeof AppSettingsRoute
+  '/deals/$id': typeof AppDealsIdRoute
+  '/inquiries/$id': typeof AppInquiriesIdRoute
   '/posts/$id': typeof AppPostsIdRoute
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/inquiries/': typeof AppInquiriesIndexRoute
   '/posts/': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$username': typeof UsernameRoute
   '/connect': typeof ConnectRoute
   '/data-deletion': typeof DataDeletionRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/$username/inquiry': typeof UsernameInquiryRoute
   '/automations': typeof AppAutomationsRoute
   '/inbox': typeof AppInboxRoute
   '/logs': typeof AppLogsRoute
+  '/page': typeof AppPageRoute
+  '/portfolio': typeof AppPortfolioRoute
+  '/rates': typeof AppRatesRoute
   '/settings': typeof AppSettingsRoute
+  '/deals/$id': typeof AppDealsIdRoute
+  '/inquiries/$id': typeof AppInquiriesIdRoute
   '/posts/$id': typeof AppPostsIdRoute
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/inquiries': typeof AppInquiriesIndexRoute
   '/posts': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$username': typeof UsernameRoute
   '/_app': typeof AppRouteWithChildren
   '/connect': typeof ConnectRoute
   '/data-deletion': typeof DataDeletionRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/$username_/inquiry': typeof UsernameInquiryRoute
   '/_app/automations': typeof AppAutomationsRoute
   '/_app/inbox': typeof AppInboxRoute
+  '/_app/inquiries': typeof AppInquiriesRouteWithChildren
   '/_app/logs': typeof AppLogsRoute
+  '/_app/page': typeof AppPageRoute
+  '/_app/portfolio': typeof AppPortfolioRoute
   '/_app/posts': typeof AppPostsRouteWithChildren
+  '/_app/rates': typeof AppRatesRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/deals/$id': typeof AppDealsIdRoute
+  '/_app/inquiries/$id': typeof AppInquiriesIdRoute
   '/_app/posts/$id': typeof AppPostsIdRoute
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/_app/inquiries/': typeof AppInquiriesIndexRoute
   '/_app/posts/': typeof AppPostsIndexRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
 }
@@ -181,69 +261,97 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$username'
     | '/connect'
     | '/data-deletion'
     | '/privacy'
     | '/terms'
+    | '/$username/inquiry'
     | '/automations'
     | '/inbox'
+    | '/inquiries'
     | '/logs'
+    | '/page'
+    | '/portfolio'
     | '/posts'
+    | '/rates'
     | '/settings'
+    | '/deals/$id'
+    | '/inquiries/$id'
     | '/posts/$id'
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/webhooks/instagram'
+    | '/inquiries/'
     | '/posts/'
     | '/api/auth/instagram/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$username'
     | '/connect'
     | '/data-deletion'
     | '/privacy'
     | '/terms'
+    | '/$username/inquiry'
     | '/automations'
     | '/inbox'
     | '/logs'
+    | '/page'
+    | '/portfolio'
+    | '/rates'
     | '/settings'
+    | '/deals/$id'
+    | '/inquiries/$id'
     | '/posts/$id'
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/webhooks/instagram'
+    | '/inquiries'
     | '/posts'
     | '/api/auth/instagram/callback'
   id:
     | '__root__'
     | '/'
+    | '/$username'
     | '/_app'
     | '/connect'
     | '/data-deletion'
     | '/privacy'
     | '/terms'
+    | '/$username_/inquiry'
     | '/_app/automations'
     | '/_app/inbox'
+    | '/_app/inquiries'
     | '/_app/logs'
+    | '/_app/page'
+    | '/_app/portfolio'
     | '/_app/posts'
+    | '/_app/rates'
     | '/_app/settings'
+    | '/_app/deals/$id'
+    | '/_app/inquiries/$id'
     | '/_app/posts/$id'
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/webhooks/instagram'
+    | '/_app/inquiries/'
     | '/_app/posts/'
     | '/api/auth/instagram/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  UsernameRoute: typeof UsernameRoute
   AppRoute: typeof AppRouteWithChildren
   ConnectRoute: typeof ConnectRoute
   DataDeletionRoute: typeof DataDeletionRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  UsernameInquiryRoute: typeof UsernameInquiryRoute
   ApiAuthInstagramRoute: typeof ApiAuthInstagramRouteWithChildren
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiCronRefreshTokensRoute: typeof ApiCronRefreshTokensRoute
@@ -257,6 +365,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$username': {
+      id: '/$username'
+      path: '/$username'
+      fullPath: '/$username'
+      preLoaderRoute: typeof UsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -294,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$username_/inquiry': {
+      id: '/$username_/inquiry'
+      path: '/$username/inquiry'
+      fullPath: '/$username/inquiry'
+      preLoaderRoute: typeof UsernameInquiryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/automations': {
       id: '/_app/automations'
       path: '/automations'
@@ -308,11 +430,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInboxRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/inquiries': {
+      id: '/_app/inquiries'
+      path: '/inquiries'
+      fullPath: '/inquiries'
+      preLoaderRoute: typeof AppInquiriesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/logs': {
       id: '/_app/logs'
       path: '/logs'
       fullPath: '/logs'
       preLoaderRoute: typeof AppLogsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/page': {
+      id: '/_app/page'
+      path: '/page'
+      fullPath: '/page'
+      preLoaderRoute: typeof AppPageRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/portfolio': {
+      id: '/_app/portfolio'
+      path: '/portfolio'
+      fullPath: '/portfolio'
+      preLoaderRoute: typeof AppPortfolioRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/posts': {
@@ -322,12 +465,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPostsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/rates': {
+      id: '/_app/rates'
+      path: '/rates'
+      fullPath: '/rates'
+      preLoaderRoute: typeof AppRatesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/deals/$id': {
+      id: '/_app/deals/$id'
+      path: '/deals/$id'
+      fullPath: '/deals/$id'
+      preLoaderRoute: typeof AppDealsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/inquiries/': {
+      id: '/_app/inquiries/'
+      path: '/'
+      fullPath: '/inquiries/'
+      preLoaderRoute: typeof AppInquiriesIndexRouteImport
+      parentRoute: typeof AppInquiriesRoute
+    }
+    '/_app/inquiries/$id': {
+      id: '/_app/inquiries/$id'
+      path: '/$id'
+      fullPath: '/inquiries/$id'
+      preLoaderRoute: typeof AppInquiriesIdRouteImport
+      parentRoute: typeof AppInquiriesRoute
     }
     '/_app/posts/': {
       id: '/_app/posts/'
@@ -381,6 +552,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppInquiriesRouteChildren {
+  AppInquiriesIdRoute: typeof AppInquiriesIdRoute
+  AppInquiriesIndexRoute: typeof AppInquiriesIndexRoute
+}
+
+const AppInquiriesRouteChildren: AppInquiriesRouteChildren = {
+  AppInquiriesIdRoute: AppInquiriesIdRoute,
+  AppInquiriesIndexRoute: AppInquiriesIndexRoute,
+}
+
+const AppInquiriesRouteWithChildren = AppInquiriesRoute._addFileChildren(
+  AppInquiriesRouteChildren,
+)
+
 interface AppPostsRouteChildren {
   AppPostsIdRoute: typeof AppPostsIdRoute
   AppPostsIndexRoute: typeof AppPostsIndexRoute
@@ -398,17 +583,27 @@ const AppPostsRouteWithChildren = AppPostsRoute._addFileChildren(
 interface AppRouteChildren {
   AppAutomationsRoute: typeof AppAutomationsRoute
   AppInboxRoute: typeof AppInboxRoute
+  AppInquiriesRoute: typeof AppInquiriesRouteWithChildren
   AppLogsRoute: typeof AppLogsRoute
+  AppPageRoute: typeof AppPageRoute
+  AppPortfolioRoute: typeof AppPortfolioRoute
   AppPostsRoute: typeof AppPostsRouteWithChildren
+  AppRatesRoute: typeof AppRatesRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppDealsIdRoute: typeof AppDealsIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAutomationsRoute: AppAutomationsRoute,
   AppInboxRoute: AppInboxRoute,
+  AppInquiriesRoute: AppInquiriesRouteWithChildren,
   AppLogsRoute: AppLogsRoute,
+  AppPageRoute: AppPageRoute,
+  AppPortfolioRoute: AppPortfolioRoute,
   AppPostsRoute: AppPostsRouteWithChildren,
+  AppRatesRoute: AppRatesRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppDealsIdRoute: AppDealsIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -426,11 +621,13 @@ const ApiAuthInstagramRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  UsernameRoute: UsernameRoute,
   AppRoute: AppRouteWithChildren,
   ConnectRoute: ConnectRoute,
   DataDeletionRoute: DataDeletionRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  UsernameInquiryRoute: UsernameInquiryRoute,
   ApiAuthInstagramRoute: ApiAuthInstagramRouteWithChildren,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiCronRefreshTokensRoute: ApiCronRefreshTokensRoute,

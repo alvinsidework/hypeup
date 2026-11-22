@@ -1,9 +1,12 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { Field, inputClass, primaryBtn } from "@/components/lens-ui";
 import { copy } from "@/lib/hypeup/copy";
 import { disconnectFn, resubscribeFn } from "@/lib/hypeup/api";
 import { daysUntil } from "@/lib/hypeup/format";
+import { getLensDesk, saveLensPrivate } from "@/lib/hypeup/lens-api";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
@@ -16,7 +19,7 @@ function SettingsPage() {
 
   return (
     <div className="max-w-xl">
-      <PageHeader title="설정" description="계정 연결과 webhook 상태입니다." />
+      <PageHeader title="설정" description="계정 연결, 정산 수단, webhook 상태입니다." />
       <section className="rounded-lg border border-border bg-surface p-5">
         <p className="text-[12px] uppercase tracking-[0.14em] text-subtle">연결된 계정</p>
         <p className="mt-2 font-display text-2xl">@{user.username}</p>
@@ -45,6 +48,8 @@ function SettingsPage() {
         </button>
       </section>
 
+      <PayoutSection />
+
       {demoMode ? (
         <p className="mt-4 rounded-md border border-border bg-surface px-4 py-3 text-[13px] text-accent">
           {copy.demoHint}
@@ -64,5 +69,68 @@ function SettingsPage() {
         {copy.disconnect}
       </button>
     </div>
+  );
+}
+
+function PayoutSection() {
+  const [notifyEmail, setNotifyEmail] = useState(true);
+  const [payoutLabel, setPayoutLabel] = useState<string | null>(null);
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountHolder, setAccountHolder] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void getLensDesk().then((desk) => {
+      setNotifyEmail(desk.page.notifyEmail);
+      setPayoutLabel(desk.page.payoutLabel);
+      if (desk.page.payoutLabel) setBankName(desk.page.payoutLabel.split(" ")[0] ?? "");
+    });
+  }, []);
+
+  return (
+    <section className="mt-4 rounded-lg border border-border bg-surface p-5">
+      <p className="text-[12px] uppercase tracking-[0.14em] text-subtle">정산 수단</p>
+      <p className="mt-2 text-[13px] leading-5 text-muted">
+        계좌는 이 화면에만 저장하고 송금하지 않습니다. 브랜드에게는 보이지 않습니다.
+        {payoutLabel ? ` 저장된 계좌 ${payoutLabel}` : ""}
+      </p>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setBusy(true);
+          const result = await saveLensPrivate({
+            data: {
+              notifyEmail,
+              bankName,
+              accountNumber,
+              accountHolder,
+            },
+          });
+          setBusy(false);
+          if (!result.ok) {
+            toast.error(result.error);
+            return;
+          }
+          setPayoutLabel(result.payoutLabel);
+          setAccountNumber("");
+          toast.success("저장했습니다.");
+        }}
+      >
+        <Field label="은행명">
+          <input className={inputClass} value={bankName} onChange={(event) => setBankName(event.target.value)} />
+        </Field>
+        <Field label="계좌번호">
+          <input className={inputClass} inputMode="numeric" autoComplete="off" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} />
+        </Field>
+        <Field label="예금주">
+          <input className={inputClass} value={accountHolder} onChange={(event) => setAccountHolder(event.target.value)} />
+        </Field>
+        <Field label="USDT">
+          <input className={inputClass} disabled placeholder="해외 브랜드 정산용. 곧 열려요." />
+        </Field>
+        <button className={`${primaryBtn} mt-4`} type="submit" disabled={busy}>저장</button>
+      </form>
+    </section>
   );
 }

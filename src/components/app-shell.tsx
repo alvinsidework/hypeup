@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Inbox, LayoutGrid, ScrollText, Settings, Wand2 } from "lucide-react";
+import { BadgeDollarSign, FileText, Home, Images, Inbox, LayoutGrid, MessageCircle, ScrollText, Settings, Wand2 } from "lucide-react";
 import { DemoBanner } from "@/components/demo-banner";
 import { RouteProgress } from "@/components/route-progress";
 import { SiteFooter } from "@/components/site-footer";
@@ -15,8 +15,12 @@ const NAV = [
   { to: "/posts", label: copy.nav.posts, icon: LayoutGrid, desktopOnly: false, mobileLabel: copy.nav.posts },
   { to: "/inbox", label: copy.nav.inbox, icon: Inbox, desktopOnly: false, mobileLabel: copy.nav.inbox },
   { to: "/automations", label: copy.nav.automations, icon: Wand2, desktopOnly: false, mobileLabel: "자동화" },
+  { to: "/page", label: copy.nav.page, icon: FileText, desktopOnly: false, mobileLabel: copy.nav.page },
+  { to: "/rates", label: "단가", icon: BadgeDollarSign, desktopOnly: true, mobileLabel: "단가" },
+  { to: "/portfolio", label: "포트폴리오", icon: Images, desktopOnly: true, mobileLabel: "포트폴리오" },
+  { to: "/inquiries", label: copy.nav.inquiries, icon: MessageCircle, desktopOnly: false, mobileLabel: copy.nav.inquiries },
   { to: "/logs", label: copy.nav.logs, icon: ScrollText, desktopOnly: false, mobileLabel: copy.nav.logs },
-  { to: "/settings", label: copy.nav.settings, icon: Settings, desktopOnly: false, mobileLabel: "더보기" },
+  { to: "/settings", label: copy.nav.settings, icon: Settings, desktopOnly: false, mobileLabel: copy.nav.settings },
 ] as const;
 
 function NavLink({
@@ -37,7 +41,7 @@ function NavLink({
       to={to}
       className={cn(
         "flex items-center gap-3 rounded-md px-3 text-[13px] transition-colors duration-200",
-        compact ? "h-12 flex-col justify-center gap-1 px-0 text-[11px]" : "h-10",
+        compact ? "h-12 min-w-[4.5rem] shrink-0 flex-col justify-center gap-1 px-0 text-[11px]" : "h-10",
         active ? "bg-surface-2 text-fg" : "text-muted hover:text-fg",
       )}
     >
@@ -119,7 +123,7 @@ export function AppShell({
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {NAV.filter((item) => !item.desktopOnly).map((item) => (
           <NavLink
             key={item.to}

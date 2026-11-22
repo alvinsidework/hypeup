@@ -98,7 +98,7 @@ export function composeAccessRequestEmail(input: {
     : "https://developers.facebook.com/apps/";
 
   const reply = [
-    "안녕하세요. Hypeup입니다.",
+    "안녕하세요. Lens입니다.",
     "",
     `@${input.instagram} 계정을 테스터로 등록했습니다.`,
     "아래 페이지에서 초대를 수락해 주세요.",
@@ -116,7 +116,7 @@ export function composeAccessRequestEmail(input: {
   ].join("\n");
 
   const text = [
-    "Hypeup 사용 신청",
+    "Lens 사용 신청",
     "",
     `인스타그램: @${input.instagram}`,
     `이메일: ${input.email}`,
@@ -135,7 +135,7 @@ export function composeAccessRequestEmail(input: {
   ].join("\n");
 
   return {
-    subject: `[Hypeup 사용 신청] @${input.instagram}`,
+    subject: `[Lens 사용 신청] @${input.instagram}`,
     text,
     replyTo: input.email,
     instagram: input.instagram,

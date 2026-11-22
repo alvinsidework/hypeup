@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Download } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { ArrowUpRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { primaryBtn } from "@/components/lens-ui";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/hypeup/lens-rules";
 
 export const Route = createFileRoute("/_app/deals/$id")({
+  staticData: { workspaceBack: { to: "/inquiries", label: "브랜드 문의" } },
   loader: async ({ params }) => {
     const record = await exportLensRecord({
       data: { dealId: params.id, save: false },
@@ -76,12 +77,6 @@ function DealRecordPage() {
   return (
     <div className="max-w-3xl">
       <div className="print:hidden">
-        <Link
-          to="/inquiries"
-          className="lens-button lens-button-quiet -ml-3 mb-1"
-        >
-          <ArrowLeft className="size-4" aria-hidden /> 브랜드 문의
-        </Link>
         <PageHeader
           title="협업 기록"
           description="인쇄 창에서 PDF로 저장할 수 있습니다."

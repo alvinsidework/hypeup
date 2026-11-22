@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, ArrowLeft } from "lucide-react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Archive, ArchiveRestore } from "lucide-react";
 import { toast } from "sonner";
 import { LensChat } from "@/components/lens-chat";
 import { PageHeader } from "@/components/page-header";
@@ -14,6 +14,7 @@ import {
 import type { ThreadDesk } from "@/lib/hypeup/lens-repo";
 
 export const Route = createFileRoute("/_app/inquiries/$id")({
+  staticData: { workspaceBack: { to: "/inquiries", label: "브랜드 문의" } },
   loader: ({ params }) => getLensThread({ data: { id: params.id } }),
   component: ThreadPage,
 });
@@ -26,12 +27,6 @@ function ThreadPage() {
     return (
       <div className="lens-panel max-w-3xl p-6">
         <h1 className="text-xl font-semibold">문의를 찾지 못했습니다.</h1>
-        <Link
-          to="/inquiries"
-          className="lens-button lens-button-secondary mt-4"
-        >
-          브랜드 문의 목록
-        </Link>
       </div>
     );
   }
@@ -85,13 +80,6 @@ function ThreadContent({ initial }: { initial: ThreadDesk }) {
 
   return (
     <div className="max-w-5xl">
-      <Link
-        to="/inquiries"
-        search={{ archived: desk.archived || undefined }}
-        className="lens-button lens-button-quiet -ml-3 mb-1"
-      >
-        <ArrowLeft className="size-4" aria-hidden /> 브랜드 문의
-      </Link>
       <PageHeader
         title={desk.company}
         description={`${desk.contactName} · ${desk.trustLabel} · ${desk.emailMasked}`}

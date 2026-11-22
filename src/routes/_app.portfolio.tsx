@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
-import { ArrowDown, ArrowLeft, ArrowUp, Images, Plus } from "lucide-react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { ArrowDown, ArrowUp, Images, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { LensConfirm } from "@/components/lens-confirm";
 import { Field, ghostBtn, inputClass, primaryBtn } from "@/components/lens-ui";
@@ -33,6 +33,7 @@ import type { MediaItem } from "@/lib/hypeup/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/portfolio")({
+  staticData: { workspaceBack: { to: "/page", label: "내 페이지" } },
   loader: () => getLensPortfolio(),
   component: PortfolioPage,
 });
@@ -131,7 +132,7 @@ function PortfolioPage() {
   const pending = useRef(false);
   const activeFetch = useRef<{ finish: () => void } | null>(null);
   const editorHeading = useRef<HTMLHeadingElement>(null);
-  const backTo = useRef<HTMLAnchorElement>(null);
+  const pageHeading = useRef<HTMLDivElement>(null);
   const patch = (partial: Partial<Draft>) =>
     setDraft((current) => (current ? { ...current, ...partial } : null));
   const canSync = user.hasToken || demoMode;
@@ -202,7 +203,7 @@ function PortfolioPage() {
 
   function closeEditor() {
     setDraft(null);
-    backTo.current?.focus();
+    pageHeading.current?.focus();
   }
 
   function selectPost(post: MediaItem) {
@@ -296,44 +297,43 @@ function PortfolioPage() {
 
   return (
     <div className="max-w-5xl">
-      <Link
-        ref={backTo}
-        to="/page"
-        className="lens-button lens-button-quiet -ml-2.5 mb-3 px-2.5 text-muted"
+      <div
+        ref={pageHeading}
+        tabIndex={-1}
+        className="scroll-mt-24 focus:outline-none"
       >
-        <ArrowLeft className="size-4" aria-hidden /> 내 페이지
-      </Link>
-      <PageHeader
-        title="포트폴리오"
-        description="Instagram 게시물을 골라 추가하고 공개할 성과를 선택하세요."
-        action={
-          <div className="flex flex-wrap gap-2">
-            <PortfolioMediaPicker
-              media={media}
-              registered={registered}
-              canSync={canSync}
-              syncing={syncing}
-              error={syncError}
-              disabled={Boolean(busy)}
-              hasOlder={Boolean(nextAfter)}
-              onRefresh={() => void loadMedia()}
-              onLoadOlder={() => {
-                if (nextAfter) void loadMedia(nextAfter);
-              }}
-              onSelect={selectPost}
-              onSelectedClose={focusEditor}
-            />
-            <button
-              type="button"
-              className={ghostBtn}
-              disabled={Boolean(busy)}
-              onClick={() => edit(empty())}
-            >
-              <Plus className="size-4" aria-hidden /> 직접 추가
-            </button>
-          </div>
-        }
-      />
+        <PageHeader
+          title="포트폴리오"
+          description="Instagram 게시물을 골라 추가하고 공개할 성과를 선택하세요."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <PortfolioMediaPicker
+                media={media}
+                registered={registered}
+                canSync={canSync}
+                syncing={syncing}
+                error={syncError}
+                disabled={Boolean(busy)}
+                hasOlder={Boolean(nextAfter)}
+                onRefresh={() => void loadMedia()}
+                onLoadOlder={() => {
+                  if (nextAfter) void loadMedia(nextAfter);
+                }}
+                onSelect={selectPost}
+                onSelectedClose={focusEditor}
+              />
+              <button
+                type="button"
+                className={ghostBtn}
+                disabled={Boolean(busy)}
+                onClick={() => edit(empty())}
+              >
+                <Plus className="size-4" aria-hidden /> 직접 추가
+              </button>
+            </div>
+          }
+        />
+      </div>
 
       <div
         className={cn(

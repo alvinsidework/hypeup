@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { ArrowUpRight } from "lucide-react";
 import { InboxView } from "@/components/inbox-view";
 import { EmptyState } from "@/components/empty-state";
 import { mediaTypeLabel } from "@/components/media-grid";
@@ -13,21 +13,13 @@ import type { CommentItem } from "@/lib/hypeup/types";
 import { useInstagramSync } from "@/lib/hypeup/use-instagram-sync";
 
 export const Route = createFileRoute("/_app/posts/$id")({
+  staticData: { workspaceBack: { to: "/posts", label: "게시물 목록" } },
   loader: ({ params }) => getPostDetail({ data: { id: params.id } }),
   pendingMs: 0,
   pendingMinMs: 0,
   pendingComponent: PostDetailPending,
   component: PostDetailPage,
 });
-
-function PostsBackLink() {
-  return (
-    <Link to="/posts" className="lens-button lens-button-quiet mb-3">
-      <ArrowLeft aria-hidden className="size-4" />
-      게시물 목록
-    </Link>
-  );
-}
 
 function CommentsSkeleton() {
   return (
@@ -51,7 +43,6 @@ function CommentsSkeleton() {
 function PostDetailPending() {
   return (
     <div>
-      <PostsBackLink />
       <div
         className="lens-panel grid gap-5 p-3.5 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:gap-6 sm:p-4 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]"
         aria-busy="true"
@@ -100,14 +91,7 @@ function PostDetailPage() {
       },
     },
   );
-  if (!media) {
-    return (
-      <div>
-        <PostsBackLink />
-        <EmptyState title="게시물을 찾을 수 없습니다" />
-      </div>
-    );
-  }
+  if (!media) return <EmptyState title="게시물을 찾을 수 없습니다" />;
 
   const published = relativeTime(media.timestamp);
   const displayedComments = refreshedComments ?? comments;
@@ -122,7 +106,6 @@ function PostDetailPage() {
 
   return (
     <div>
-      <PostsBackLink />
       <div className="lens-panel grid items-start gap-5 p-3.5 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:gap-6 sm:p-4 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
         <MediaPreview media={media} eager allowVideo className="rounded-md" />
         <div className="min-w-0 p-1 sm:py-3">

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import {
   ArrowUpRight,
   Copy,
   Eye,
+  Globe2,
   Images,
   Plus,
   Receipt,
@@ -13,14 +14,24 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ProfilePhotoField } from "@/components/profile-photo-field";
 import { Field, ghostBtn, inputClass, primaryBtn } from "@/components/lens-ui";
+import { legal } from "@/lib/hypeup/legal";
 import { getLensDesk, saveLensPage } from "@/lib/hypeup/lens-api";
-import { CATEGORIES } from "@/lib/hypeup/lens-rules";
+import { CATEGORIES, validateUsername } from "@/lib/hypeup/lens-rules";
 import type { PageDraft } from "@/lib/hypeup/lens-repo";
 
 export const Route = createFileRoute("/_app/page")({
   loader: () => getLensDesk(),
   component: PageEditor,
 });
+
+const publicHost = new URL(legal.site).host;
+
+function checkAddress(address: string, isPublic: boolean) {
+  if (!address.trim())
+    return isPublic ? "공개할 페이지 주소를 입력해 주세요." : null;
+  const result = validateUsername(address);
+  return result.ok ? null : result.error;
+}
 
 function PageEditor() {
   const data = Route.useLoaderData();
@@ -32,6 +43,8 @@ function PageEditor() {
     undefined,
   );
   const [edited, setEdited] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const addressInput = useRef<HTMLInputElement>(null);
   const [shareLink, setShareLink] = useState<{
     username: string;
     url: string;
@@ -41,6 +54,25 @@ function PageEditor() {
   function patch(partial: Partial<PageDraft>) {
     setEdited(true);
     setForm((current) => ({ ...current, ...partial }));
+  }
+
+  useEffect(() => {
+    if (
+      addressError &&
+      !busy &&
+      document.activeElement !== addressInput.current
+    )
+      focusAddress();
+  }, [addressError, busy]);
+
+  function focusAddress() {
+    addressInput.current?.scrollIntoView({ block: "center" });
+    addressInput.current?.focus({ preventScroll: true });
+  }
+
+  function showAddressError(message: string) {
+    if (!busy) focusAddress();
+    setAddressError(message);
   }
 
   async function copyPublicLink() {
@@ -72,7 +104,17 @@ function PageEditor() {
           </Link>
         }
       />
-      <nav aria-label="협업 자료" className="mb-4 flex flex-wrap gap-2">
+      <nav
+        aria-label="내 페이지 바로가기"
+        className="mb-4 flex flex-wrap gap-2"
+      >
+        <button
+          type="button"
+          className="lens-button lens-button-quiet"
+          onClick={focusAddress}
+        >
+          <Globe2 className="size-4" aria-hidden /> 공개 설정
+        </button>
         <Link to="/portfolio" className="lens-button lens-button-quiet">
           <Images className="size-4" aria-hidden /> 포트폴리오
         </Link>
@@ -84,6 +126,12 @@ function PageEditor() {
         onSubmit={async (event) => {
           event.preventDefault();
           if (busy || preparingPhoto || !dirty) return;
+          const problem = checkAddress(form.username, form.isPublic);
+          if (problem) {
+            showAddressError(problem);
+            return;
+          }
+          setAddressError(null);
           setBusy(true);
           try {
             const result = await saveLensPage({
@@ -104,7 +152,13 @@ function PageEditor() {
               },
             });
             if (!result.ok) {
-              toast.error(result.error);
+              if (result.error === "이미 쓰는 주소입니다.") {
+                setAddressError(
+                  "이미 사용 중인 주소예요. 다른 주소를 입력해 주세요.",
+                );
+              } else {
+                toast.error(result.error);
+              }
               return;
             }
             toast.success("저장했습니다.");
@@ -204,27 +258,71 @@ function PageEditor() {
                   {published ? "공개 중" : "비공개"}
                 </span>
               </div>
-              <Field label="공개 페이지 주소">
+              <label
+                htmlFor="public-page-address"
+                className="mt-4 block text-sm font-medium text-muted"
+              >
+                공개 페이지 주소
+              </label>
+              <div
+                className={`mt-2 flex min-h-12 items-center rounded-md border bg-surface-2 px-3.5 focus-within:border-accent ${addressError ? "border-danger" : "border-border"}`}
+              >
+                <span
+                  id="public-page-address-domain"
+                  className="shrink-0 text-sm text-muted"
+                >
+                  {publicHost}/
+                </span>
                 <input
-                  className={inputClass}
+                  ref={addressInput}
+                  id="public-page-address"
+                  className="min-h-12 min-w-0 flex-1 bg-transparent text-base font-semibold placeholder:font-normal focus:outline-none"
                   value={form.username}
                   maxLength={24}
                   autoCapitalize="none"
                   autoComplete="off"
                   spellCheck={false}
-                  onChange={(event) =>
-                    patch({ username: event.target.value.toLowerCase() })
+                  aria-invalid={Boolean(addressError)}
+                  aria-required={form.isPublic}
+                  aria-describedby={
+                    addressError
+                      ? "public-page-address-error public-page-address-domain public-page-address-hint"
+                      : "public-page-address-domain public-page-address-hint"
                   }
-                  placeholder={data.suggestion || "mina"}
+                  onChange={(event) => {
+                    setAddressError(null);
+                    patch({ username: event.target.value.toLowerCase() });
+                  }}
+                  placeholder="주소 입력"
                 />
-              </Field>
-              {data.suggestion && !form.username ? (
+              </div>
+              {addressError ? (
+                <p
+                  id="public-page-address-error"
+                  role="alert"
+                  className="mt-2 text-sm font-medium text-danger"
+                >
+                  {addressError}
+                </p>
+              ) : null}
+              <p
+                id="public-page-address-hint"
+                className="mt-2 text-sm text-muted"
+              >
+                주소 끝부분에 들어갈 이름이에요. 영문 소문자·숫자·하이픈
+                3~24자를 쓸 수 있어요.
+              </p>
+              {data.suggestion && !form.username.trim() ? (
                 <button
                   type="button"
-                  className="lens-button lens-button-quiet mt-1 -ml-3"
-                  onClick={() => patch({ username: data.suggestion })}
+                  className="lens-button lens-button-secondary mt-2 max-w-full wrap-anywhere text-left"
+                  onClick={() => {
+                    setAddressError(null);
+                    patch({ username: data.suggestion });
+                    focusAddress();
+                  }}
                 >
-                  {data.suggestion} 사용
+                  추천 주소 {data.suggestion} 사용
                 </button>
               ) : null}
               <label className="mt-4 flex min-h-12 cursor-pointer items-center justify-between gap-3 border-t border-border py-2.5 text-sm font-medium">
@@ -233,9 +331,15 @@ function PageEditor() {
                   className="peer sr-only"
                   type="checkbox"
                   checked={form.isPublic}
-                  onChange={(event) =>
-                    patch({ isPublic: event.target.checked })
-                  }
+                  onChange={(event) => {
+                    const next = event.target.checked;
+                    patch({ isPublic: next });
+                    const problem = next
+                      ? checkAddress(form.username, true)
+                      : null;
+                    if (problem) showAddressError(problem);
+                    else setAddressError(null);
+                  }}
                 />
                 <span
                   aria-hidden
@@ -246,6 +350,11 @@ function PageEditor() {
                   />
                 </span>
               </label>
+              {form.isPublic && !published && !addressError ? (
+                <p className="text-sm text-muted">
+                  변경사항을 저장하면 페이지가 공개됩니다.
+                </p>
+              ) : null}
               {published ? (
                 <div className="mt-2 flex items-center gap-2 rounded-md bg-surface-2 px-2">
                   <Link

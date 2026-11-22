@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode, type TouchEvent } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   ArrowUpRight,
   BadgeDollarSign,
   FileText,
@@ -26,6 +27,12 @@ import { copy } from "@/lib/hypeup/copy";
 import { daysUntil, formatCount, initial } from "@/lib/hypeup/format";
 import type { HypeupUser } from "@/lib/hypeup/types";
 import { cn } from "@/lib/utils";
+
+declare module "@tanstack/react-router" {
+  interface StaticDataRouteOption {
+    workspaceBack?: { to: "/posts" | "/inquiries" | "/page"; label: string };
+  }
+}
 
 const NAV_GROUPS = [
   {
@@ -139,8 +146,18 @@ export function AppShell({
   demoMode: boolean;
   children: ReactNode;
 }) {
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
+  const { pathname, back, archived } = useRouterState({
+    select: (state) => {
+      const match = state.matches.at(-1);
+      return {
+        pathname: state.location.pathname,
+        back: match?.staticData.workspaceBack,
+        archived:
+          match?.routeId === "/_app/inquiries/$id" &&
+          match.loaderData?.archived === true,
+      };
+    },
+    structuralSharing: true,
   });
   const compact = pathname !== "/";
   const [menuOpen, setMenuOpen] = useState(false);
@@ -219,8 +236,28 @@ export function AppShell({
         <header
           className="lens-workspace-header sticky top-0 z-30 border-b border-border bg-bg pt-[env(safe-area-inset-top)]"
           data-compact={compact}
+          data-has-back={Boolean(back)}
         >
           <div className="lens-workspace-toolbar mx-auto flex min-h-[68px] max-w-[1152px] items-center gap-4 px-4 sm:px-8 lg:min-h-[76px]">
+            {back ? (
+              <Link
+                to={back.to}
+                search={
+                  back.to === "/inquiries" && archived
+                    ? { archived: true }
+                    : undefined
+                }
+                aria-label={back.label}
+                className="flex h-12 min-w-12 shrink-0 items-center justify-center gap-2 rounded-full bg-surface-2 px-3.5 text-sm font-semibold transition-colors hover:bg-border print:hidden"
+              >
+                <ArrowLeft
+                  className="size-6 shrink-0"
+                  strokeWidth={1.9}
+                  aria-hidden
+                />
+                <span className="hidden min-[360px]:inline">{back.label}</span>
+              </Link>
+            ) : null}
             <Link
               to="/"
               aria-label="Lens 홈"
@@ -232,7 +269,7 @@ export function AppShell({
               <LogoMark className="size-8" />
               <Wordmark />
             </Link>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="lens-workspace-actions ml-auto flex items-center gap-2">
               <PwaInstallButton />
               <Dialog.Trigger asChild>
                 <button
@@ -245,7 +282,9 @@ export function AppShell({
                     strokeWidth={1.85}
                     aria-hidden
                   />
-                  <span className={compact ? "lens-secondary-brand" : undefined}>
+                  <span
+                    className={compact ? "lens-secondary-brand" : undefined}
+                  >
                     메뉴
                   </span>
                 </button>

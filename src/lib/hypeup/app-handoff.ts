@@ -14,6 +14,7 @@ export function appBridgeResponse(
   const headers = new Headers({
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
+    "referrer-policy": "no-referrer",
   });
   for (const cookie of extraCookies) headers.append("set-cookie", cookie);
   headers.append("set-cookie", cookieHeader(OAUTH_CLIENT_COOKIE, "", request, 0));

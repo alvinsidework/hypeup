@@ -3,43 +3,198 @@ import { encryptToken } from "@/lib/hypeup/crypto.server";
 import {
   instagramAppId,
   instagramAppSecret,
-  isDemoMode,
   oauthRedirectUri,
   OAUTH_CLIENT_COOKIE,
   OAUTH_STATE_COOKIE,
   SESSION_COOKIE,
 } from "@/lib/hypeup/env.server";
-import { addLog, upsertUser } from "@/lib/hypeup/repo";
+import {
+  claimOAuthAttempt,
+  completeOAuthAttempt,
+  failOAuthAttempt,
+  readOAuthAttempt,
+} from "@/lib/hypeup/oauth-attempt.server";
+import {
+  verifyOAuthState,
+  type OAuthClient,
+} from "@/lib/hypeup/oauth-state.server";
+import { addLog, setWebhookSubscribed, upsertUser } from "@/lib/hypeup/repo";
 import { appBridgeResponse, signAppHandoff } from "@/lib/hypeup/app-handoff";
-import { cookieHeader, readCookieHeader, signSession } from "@/lib/hypeup/session.server";
+import {
+  cookieHeader,
+  readCookieHeader,
+  signSession,
+  verifySessionToken,
+} from "@/lib/hypeup/session.server";
 import {
   exchangeLongLivedToken,
   exchangeShortLivedToken,
   fetchMe,
+  isAuthorizationCodeUsed,
   isLongLivedExchangeRejected,
   isProfessionalAccount,
-  isUnsupportedMethod,
   parseGrantedScopes,
 } from "@/lib/instagram/oauth";
 import { subscribeApps } from "@/lib/instagram/messages";
-import { graphErrorPayload } from "@/lib/instagram/errors";
+import { graphErrorPayload, InstagramApiError } from "@/lib/instagram/errors";
 
-function redirectTo(request: Request, path: string, extraCookies: string[] = []) {
-  const headers = new Headers({ Location: new URL(path, request.url).toString() });
-  for (const cookie of extraCookies) headers.append("set-cookie", cookie);
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const CALLBACK_WAIT_MS = [0, 200, 400, 800, 1_600, 2_400, 3_200];
+const MAX_CALLBACK_RESUMES = 2;
+
+function redirectTo(target: URL, cookies: string[] = []) {
+  const headers = new Headers({
+    Location: target.href,
+    "cache-control": "no-store",
+    "referrer-policy": "no-referrer",
+  });
+  for (const cookie of cookies) headers.append("set-cookie", cookie);
   return new Response(null, { status: 302, headers });
 }
 
-function connectError(request: Request, code: string, detail?: string, extraCookies: string[] = []) {
-  if (readCookieHeader(request, OAUTH_CLIENT_COOKIE) === "app") {
-    return appBridgeResponse(request, { error: code, detail }, extraCookies);
-  }
+function connectError(
+  request: Request,
+  client: OAuthClient,
+  error: string,
+  cookies: string[] = [],
+) {
+  if (client === "app") return appBridgeResponse(request, { error }, cookies);
   const target = new URL("/connect", request.url);
-  target.searchParams.set("error", code);
-  if (detail) target.searchParams.set("detail", detail.slice(0, 180));
-  const headers = new Headers({ Location: target.toString() });
-  for (const cookie of extraCookies) headers.append("set-cookie", cookie);
-  return new Response(null, { status: 302, headers });
+  target.searchParams.set("error", error);
+  return redirectTo(target, cookies);
+}
+
+async function connected(
+  request: Request,
+  client: OAuthClient,
+  session: string,
+  clearState: string,
+) {
+  if (client === "app") {
+    return appBridgeResponse(
+      request,
+      { handoff: await signAppHandoff(session) },
+      [clearState],
+    );
+  }
+  return redirectTo(new URL("/", request.url), [
+    clearState,
+    cookieHeader(SESSION_COOKIE, session, request, SESSION_TTL_SECONDS),
+  ]);
+}
+
+async function waitForOAuthAttempt(proof: string) {
+  for (const delay of CALLBACK_WAIT_MS) {
+    if (delay) await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    const attempt = await readOAuthAttempt(proof);
+    if (attempt?.status !== "pending") return attempt;
+  }
+  return { status: "pending" } as const;
+}
+
+function exchangeErrorCode(err: unknown): string {
+  if (isAuthorizationCodeUsed(err)) return "code_used";
+  if (err instanceof InstagramApiError && err.status === 429)
+    return "rate_limited";
+  const message = err instanceof Error ? err.message : "";
+  if (/APP_ENCRYPTION_KEY|AUTH_SECRET/i.test(message)) return "missing_keys";
+  if (/redirect/i.test(message)) return "redirect_mismatch";
+  if (isLongLivedExchangeRejected(err)) return "token_exchange";
+  if (/role|tester|not authorized|permissions/i.test(message))
+    return "not_tester";
+  return "denied";
+}
+
+async function finishAccountConnection(
+  request: Request,
+  client: OAuthClient,
+  proof: string,
+  code: string,
+  appId: string,
+  appSecret: string,
+  clearState: string,
+) {
+  try {
+    const shortLived = await exchangeShortLivedToken({
+      appId,
+      appSecret,
+      redirectUri: oauthRedirectUri(request),
+      code,
+    });
+    let accessToken = shortLived.access_token;
+    let expiresIn = 60 * 60;
+    try {
+      const longLived = await exchangeLongLivedToken({
+        appSecret,
+        shortLived: shortLived.access_token,
+      });
+      accessToken = longLived.access_token;
+      expiresIn = longLived.expires_in ?? 60 * 60 * 24 * 60;
+    } catch (error) {
+      if (!isLongLivedExchangeRejected(error)) throw error;
+      console.error(
+        "[hypeup] long-lived token exchange rejected, continuing with the short-lived token",
+      );
+    }
+
+    const me = await fetchMe(accessToken);
+    if (!isProfessionalAccount(me.account_type)) {
+      await failOAuthAttempt(proof, "personal_account");
+      return connectError(request, client, "personal_account", [clearState]);
+    }
+    const igUserId = String(me.user_id ?? me.id ?? shortLived.user_id);
+    const user = await upsertUser({
+      igUserId,
+      username: me.username,
+      name: me.name ?? null,
+      accountType: me.account_type ?? null,
+      profilePictureUrl: me.profile_picture_url ?? null,
+      followersCount: me.followers_count ?? null,
+      mediaCount: me.media_count ?? null,
+      tokenCipher: encryptToken(accessToken),
+      tokenExpiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+      grantedScopes: parseGrantedScopes(shortLived.permissions),
+    });
+    const session = await signSession({
+      userId: user.id,
+      igUserId: user.igUserId,
+    });
+    await completeOAuthAttempt(proof, user.id);
+
+    // The connection is usable even when activity logging or webhook setup fails.
+    try {
+      await addLog({
+        userId: user.id,
+        type: "AUTH",
+        success: true,
+        message: `@${user.username} 계정을 연결했습니다.`,
+      });
+      await subscribeApps(accessToken, user.igUserId);
+      await setWebhookSubscribed(user.id, new Date());
+    } catch (error) {
+      await addLog({
+        userId: user.id,
+        type: "ERROR",
+        success: false,
+        message:
+          "연결 후 설정 기록에 실패했습니다. 실시간 수신 상태를 확인하세요.",
+        meta: graphErrorPayload(error),
+      }).catch(() => {
+        console.error(
+          "[hypeup] Instagram connection follow-up could not be recorded",
+        );
+      });
+    }
+
+    return connected(request, client, session, clearState);
+  } catch (error) {
+    const failure = exchangeErrorCode(error);
+    console.error("[hypeup] Instagram OAuth failed", failure);
+    await failOAuthAttempt(proof, failure).catch(() => {
+      console.error("[hypeup] Instagram OAuth failure could not be recorded");
+    });
+    return connectError(request, client, failure, [clearState]);
+  }
 }
 
 export const Route = createFileRoute("/api/auth/instagram/callback")({
@@ -47,112 +202,85 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
     handlers: {
       GET: async ({ request }) => {
         const url = new URL(request.url);
-        const error = url.searchParams.get("error");
-        const errorReason = url.searchParams.get("error_reason") ?? "";
-        if (error) {
-          const description = url.searchParams.get("error_description") ?? "";
-          const blob = `${error} ${errorReason} ${description}`;
-          console.error("[hypeup] instagram oauth returned error", blob.slice(0, 300));
-          return connectError(request, "denied", description.replaceAll("+", " "));
-        }
-        if (isDemoMode() || !instagramAppId() || !instagramAppSecret()) {
-          return connectError(request, "not_configured");
-        }
+        const appId = instagramAppId();
+        const appSecret = instagramAppSecret();
+        const proof = readCookieHeader(request, OAUTH_STATE_COOKIE);
+        const previousClient =
+          readCookieHeader(request, OAUTH_CLIENT_COOKIE) === "app"
+            ? "app"
+            : "web";
+        if (!appId || !appSecret)
+          return connectError(request, previousClient, "not_configured");
 
-        const state = url.searchParams.get("state") ?? "";
-        const expected = readCookieHeader(request, OAUTH_STATE_COOKIE);
-        const clearState = cookieHeader(OAUTH_STATE_COOKIE, "", request, 0);
-        if (!state || !expected || state !== expected) {
-          return connectError(request, "state", undefined, [clearState]);
-        }
-
+        const state = url.searchParams.get("state");
         const code = url.searchParams.get("code");
-        if (!code) return connectError(request, "denied", undefined, [clearState]);
+        const resume = url.searchParams.get("resume");
+        const client = await verifyOAuthState(proof, state);
+        if (!proof || !state || !client) {
+          // A completed web navigation may be restored after its state cookie was cleared.
+          const session = readCookieHeader(request, SESSION_COOKIE);
+          if (
+            !proof &&
+            state &&
+            (code || resume) &&
+            session &&
+            (await verifySessionToken(session))
+          ) {
+            return redirectTo(new URL("/", request.url));
+          }
+          return connectError(request, previousClient, "state");
+        }
 
-        const redirectUri = oauthRedirectUri(request);
+        const resumeCount = resume === "1" ? 1 : resume === "2" ? 2 : 0;
+        const clearState = cookieHeader(OAUTH_STATE_COOKIE, "", request, 0);
+        if (url.searchParams.has("error") || (!code && !resumeCount)) {
+          const providerError = new Error(
+            url.searchParams.get("error_description") ?? "",
+          );
+          const failure = isAuthorizationCodeUsed(providerError)
+            ? "code_used"
+            : "denied";
+          return connectError(request, client, failure, [clearState]);
+        }
+
         try {
-          const shortLived = await exchangeShortLivedToken({
-            appId: instagramAppId()!,
-            appSecret: instagramAppSecret()!,
-            redirectUri,
-            code,
-          });
-          let accessToken = shortLived.access_token;
-          let expiresIn = 60 * 60;
-          try {
-            const longLived = await exchangeLongLivedToken({
-              appSecret: instagramAppSecret()!,
-              shortLived: shortLived.access_token,
+          if (code && !resumeCount && (await claimOAuthAttempt(proof))) {
+            return finishAccountConnection(
+              request,
+              client,
+              proof,
+              code,
+              appId,
+              appSecret,
+              clearState,
+            );
+          }
+
+          const attempt = await waitForOAuthAttempt(proof);
+          if (attempt?.status === "complete") {
+            const session = await signSession({
+              userId: attempt.userId,
+              igUserId: attempt.igUserId,
             });
-            accessToken = longLived.access_token;
-            expiresIn = longLived.expires_in ?? 60 * 60 * 24 * 60;
-          } catch (exchangeError) {
-            if (!isLongLivedExchangeRejected(exchangeError)) throw exchangeError;
-            console.error("[hypeup] long-lived token exchange rejected, continuing with the short-lived token");
+            return connected(request, client, session, clearState);
           }
-          const me = await fetchMe(accessToken);
-          if (!isProfessionalAccount(me.account_type)) {
-            return connectError(request, "personal_account", undefined, [clearState]);
+          if (attempt?.status === "pending") {
+            if (resumeCount === MAX_CALLBACK_RESUMES) {
+              return connectError(request, client, "oauth_pending");
+            }
+            const next = new URL(url.pathname, request.url);
+            next.searchParams.set("state", state);
+            next.searchParams.set("resume", String(resumeCount + 1));
+            return redirectTo(next);
           }
-          const igUserId = String(me.user_id ?? me.id ?? shortLived.user_id);
-          const user = await upsertUser({
-            igUserId,
-            username: me.username,
-            name: me.name ?? null,
-            accountType: me.account_type ?? null,
-            profilePictureUrl: me.profile_picture_url ?? null,
-            followersCount: me.followers_count ?? null,
-            mediaCount: me.media_count ?? null,
-            tokenCipher: encryptToken(accessToken),
-            tokenExpiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
-            grantedScopes: parseGrantedScopes(shortLived.permissions),
-          });
-          await addLog({
-            userId: user.id,
-            type: "AUTH",
-            success: true,
-            message: `@${user.username} 계정을 연결했습니다.`,
-          });
-          try {
-            await subscribeApps(accessToken, user.igUserId);
-            const { setWebhookSubscribed } = await import("@/lib/hypeup/repo");
-            await setWebhookSubscribed(user.id, new Date());
-          } catch (subscribeError) {
-            await addLog({
-              userId: user.id,
-              type: "ERROR",
-              success: false,
-              message: "webhook 구독에 실패했습니다. 설정에서 다시 구독하세요.",
-              meta: graphErrorPayload(subscribeError),
-            });
-          }
-          const session = await signSession({ userId: user.id, igUserId: user.igUserId });
-          if (readCookieHeader(request, OAUTH_CLIENT_COOKIE) === "app") {
-            return appBridgeResponse(request, { handoff: await signAppHandoff(session) }, [clearState]);
-          }
-          return redirectTo(request, "/", [
+          return connectError(request, client, attempt?.error ?? "code_used", [
             clearState,
-            cookieHeader(SESSION_COOKIE, session, request, 60 * 60 * 24 * 30),
           ]);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "";
-          console.error("[hypeup] instagram oauth callback failed", message.slice(0, 300));
-          if (/APP_ENCRYPTION_KEY|AUTH_SECRET/i.test(message)) {
-            return connectError(request, "missing_keys", undefined, [clearState]);
-          }
-          if (/redirect/i.test(message)) {
-            return connectError(request, "redirect_mismatch", message, [clearState]);
-          }
-          if (isLongLivedExchangeRejected(err)) {
-            return connectError(request, "token_exchange", undefined, [clearState]);
-          }
-          if (/role|tester|not authorized|permissions/i.test(message)) {
-            return connectError(request, "not_tester", message, [clearState]);
-          }
-          if (isUnsupportedMethod(err)) {
-            return connectError(request, "token_exchange", undefined, [clearState]);
-          }
-          return connectError(request, "denied", message, [clearState]);
+        } catch {
+          console.error(
+            "[hypeup] Instagram OAuth attempt store is unavailable",
+          );
+          return connectError(request, client, "oauth_retry", [clearState]);
         }
       },
     },

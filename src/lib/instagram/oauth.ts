@@ -9,6 +9,7 @@ export const OAUTH_SCOPES = [
 ].join(",");
 
 export {
+  isAuthorizationCodeUsed,
   isLongLivedExchangeRejected,
   isProfessionalAccount,
   isUnsupportedMethod,
@@ -51,13 +52,17 @@ export async function exchangeShortLivedToken(input: {
   redirectUri: string;
   code: string;
 }): Promise<ShortTokenResponse> {
-  const payload = await formPost<unknown>("https://api.instagram.com/oauth/access_token", {
-    client_id: input.appId,
-    client_secret: input.appSecret,
-    grant_type: "authorization_code",
-    redirect_uri: input.redirectUri,
-    code: normalizeAuthCode(input.code),
-  });
+  const payload = await formPost<unknown>(
+    "https://api.instagram.com/oauth/access_token",
+    {
+      client_id: input.appId,
+      client_secret: input.appSecret,
+      grant_type: "authorization_code",
+      redirect_uri: input.redirectUri,
+      code: normalizeAuthCode(input.code),
+    },
+    { singleUse: true },
+  );
   return asShortToken(payload);
 }
 

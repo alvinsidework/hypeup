@@ -70,5 +70,9 @@ export const oauthErrorCopy: Record<string, string> = {
   token_exchange: copy.tokenExchange,
   missing_keys: copy.missingKeys,
   token_expired: copy.tokenExpired,
-  state: "로그인 검증에 실패했습니다. 다시 연결하세요.",
+  code_used: "이미 처리됐거나 만료된 인스타그램 연결 요청이에요. 아래 버튼을 눌러 새로 연결해 주세요.",
+  oauth_pending: "아직 연결 결과를 확인하지 못했어요. 잠시 후 홈에서 확인하거나 다시 연결해 주세요.",
+  oauth_retry: "연결을 확인하지 못했어요. 아래 버튼을 눌러 다시 시도해 주세요.",
+  rate_limited: copy.rateLimited,
+  state: "연결 요청을 확인하지 못했어요. 아래 버튼을 눌러 새로 연결해 주세요.",
 };

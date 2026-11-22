@@ -31,7 +31,11 @@ function asError(payload: unknown, status: number): InstagramApiError {
   return new InstagramApiError(message, { status, code, subcode, raw: payload });
 }
 
-async function igFetch(url: string, init: RequestInit, token?: string): Promise<unknown> {
+async function igFetch(
+  url: string,
+  init: RequestInit,
+  { token, retryOnRateLimit = true }: { token?: string; retryOnRateLimit?: boolean } = {},
+): Promise<unknown> {
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("content-type")) {
@@ -49,7 +53,7 @@ async function igFetch(url: string, init: RequestInit, token?: string): Promise<
   };
 
   let res = await run();
-  if (res.status === 429) {
+  if (retryOnRateLimit && res.status === 429) {
     await sleep(800);
     res = await run();
   }
@@ -68,7 +72,7 @@ function graphUrl(path: string, search: Record<string, string> = {}, token?: str
 }
 
 export async function graphGet<T>(token: string, path: string, search: Record<string, string> = {}): Promise<T> {
-  return (await igFetch(graphUrl(path, search, token).toString(), { method: "GET" }, token)) as T;
+  return (await igFetch(graphUrl(path, search, token).toString(), { method: "GET" }, { token })) as T;
 }
 
 export async function graphPost<T>(
@@ -81,23 +85,32 @@ export async function graphPost<T>(
   return (await igFetch(
     url.toString(),
     { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) },
-    token,
+    { token },
   )) as T;
 }
 
 export async function graphDelete<T>(token: string, path: string): Promise<T> {
-  return (await igFetch(graphUrl(path, {}, token).toString(), { method: "DELETE" }, token)) as T;
+  return (await igFetch(graphUrl(path, {}, token).toString(), { method: "DELETE" }, { token })) as T;
 }
 
 export async function graphRawGet<T>(url: string, token?: string): Promise<T> {
-  return (await igFetch(url, { method: "GET" }, token)) as T;
+  return (await igFetch(url, { method: "GET" }, { token })) as T;
 }
 
-export async function formPost<T>(url: string, form: Record<string, string>): Promise<T> {
+export async function formPost<T>(
+  url: string,
+  form: Record<string, string>,
+  { singleUse = false }: { singleUse?: boolean } = {},
+): Promise<T> {
   const body = new URLSearchParams(form);
-  return (await igFetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
-  })) as T;
+  return (await igFetch(
+    url,
+    {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body,
+      redirect: singleUse ? "error" : "follow",
+    },
+    { retryOnRateLimit: !singleUse },
+  )) as T;
 }

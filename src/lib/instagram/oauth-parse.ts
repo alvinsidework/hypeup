@@ -2,6 +2,14 @@ export function normalizeAuthCode(code: string): string {
   return code.replace(/#_$/, "");
 }
 
+export function isAuthorizationCodeUsed(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (/\bauthori[sz]ation code\s+(?:has (?:already )?been used|(?:is |was )?already used)\b/i.test(error.message) ||
+      /\bmatching code was not found or was already used\b/i.test(error.message))
+  );
+}
+
 export function isUnsupportedMethod(error: unknown): boolean {
   return error instanceof Error && /unsupported request - method type/i.test(error.message);
 }

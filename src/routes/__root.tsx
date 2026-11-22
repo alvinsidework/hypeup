@@ -9,7 +9,11 @@ import { NativeAuthBridge } from "@/components/native-auth-bridge";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PwaInstallProvider } from "@/components/pwa-install";
 import { PwaServiceWorker } from "@/components/pwa-service-worker";
-import { initializeLensTheme } from "@/components/lens-theme";
+import {
+  initializeLensTheme,
+  lensDarkThemeColor,
+  lensLightThemeColor,
+} from "@/components/lens-theme";
 import { TaskProgressProvider } from "@/components/route-progress";
 import appCss from "../styles.css?url";
 
@@ -48,12 +52,12 @@ export const Route = createRootRoute({
       <head>
         <meta
           name="theme-color"
-          content="#fafafa"
+          content={lensLightThemeColor}
           media="(prefers-color-scheme: light)"
         />
         <meta
           name="theme-color"
-          content="#101114"
+          content={lensDarkThemeColor}
           media="(prefers-color-scheme: dark)"
         />
         <script dangerouslySetInnerHTML={{ __html: initializeLensTheme }} />

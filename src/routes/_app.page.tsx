@@ -50,7 +50,19 @@ function PageEditor() {
     url: string;
   } | null>(null);
   const dirty = edited || profilePhoto !== undefined;
-  const published = data.page.isPublic && Boolean(data.page.username);
+  const savedAddressNeedsChange =
+    Boolean(data.page.username) && !validateUsername(data.page.username).ok;
+  const editingSavedConflict =
+    savedAddressNeedsChange && form.username === data.page.username;
+  const published =
+    data.page.isPublic &&
+    Boolean(data.page.username) &&
+    !savedAddressNeedsChange;
+  const visibleAddressError =
+    addressError ??
+    (editingSavedConflict
+      ? "저장된 주소가 Lens에서 사용하는 주소와 겹쳐요. 새 주소를 입력해 주세요."
+      : null);
   function patch(partial: Partial<PageDraft>) {
     setEdited(true);
     setForm((current) => ({ ...current, ...partial }));
@@ -255,7 +267,11 @@ function PageEditor() {
                     className="size-1.5 rounded-full bg-current"
                     aria-hidden
                   />
-                  {published ? "공개 중" : "비공개"}
+                  {savedAddressNeedsChange
+                    ? "주소 변경 필요"
+                    : published
+                      ? "공개 중"
+                      : "비공개"}
                 </span>
               </div>
               <label
@@ -265,7 +281,7 @@ function PageEditor() {
                 공개 페이지 주소
               </label>
               <div
-                className={`mt-2 flex min-h-12 items-center rounded-md border bg-surface-2 px-3.5 focus-within:border-accent ${addressError ? "border-danger" : "border-border"}`}
+                className={`mt-2 flex min-h-12 items-center rounded-md border bg-surface-2 px-3.5 focus-within:border-accent ${visibleAddressError ? "border-danger" : "border-border"}`}
               >
                 <span
                   id="public-page-address-domain"
@@ -282,10 +298,10 @@ function PageEditor() {
                   autoCapitalize="none"
                   autoComplete="off"
                   spellCheck={false}
-                  aria-invalid={Boolean(addressError)}
+                  aria-invalid={Boolean(visibleAddressError)}
                   aria-required={form.isPublic}
                   aria-describedby={
-                    addressError
+                    visibleAddressError
                       ? "public-page-address-error public-page-address-domain public-page-address-hint"
                       : "public-page-address-domain public-page-address-hint"
                   }
@@ -296,13 +312,13 @@ function PageEditor() {
                   placeholder="주소 입력"
                 />
               </div>
-              {addressError ? (
+              {visibleAddressError ? (
                 <p
                   id="public-page-address-error"
                   role="alert"
                   className="mt-2 text-sm font-medium text-danger"
                 >
-                  {addressError}
+                  {visibleAddressError}
                 </p>
               ) : null}
               <p
@@ -312,7 +328,8 @@ function PageEditor() {
                 주소 끝부분에 들어갈 이름이에요. 영문 소문자·숫자·하이픈
                 3~24자를 쓸 수 있어요.
               </p>
-              {data.suggestion && !form.username.trim() ? (
+              {data.suggestion &&
+              (!form.username.trim() || editingSavedConflict) ? (
                 <button
                   type="button"
                   className="lens-button lens-button-secondary mt-2 max-w-full wrap-anywhere text-left"
@@ -350,7 +367,7 @@ function PageEditor() {
                   />
                 </span>
               </label>
-              {form.isPublic && !published && !addressError ? (
+              {form.isPublic && !published && !visibleAddressError ? (
                 <p className="text-sm text-muted">
                   변경사항을 저장하면 페이지가 공개됩니다.
                 </p>

@@ -8,7 +8,7 @@
   "scope": "/",
   "display": "standalone",
   "background_color": "#fafafa",
-  "theme_color": "#17191e",
+  "theme_color": "#fafafa",
   "icons": [
     {
       "src": "/lens-icon-192.png",

@@ -9,6 +9,7 @@ export const RESERVED_USERNAMES = new Set([
   "brand",
   "c",
   "connect",
+  "contacts",
   "data-deletion",
   "deals",
   "i",
@@ -222,7 +223,7 @@ export function validateUsername(raw: string): { ok: true; username: string } | 
     return { ok: false, error: "주소는 소문자, 숫자, 하이픈 3~24자입니다. 하이픈으로 시작하거나 끝날 수 없습니다." };
   }
   if (RESERVED_USERNAMES.has(username)) {
-    return { ok: false, error: "이 주소는 쓸 수 없습니다." };
+    return { ok: false, error: "Lens에서 사용하는 주소예요. 다른 주소를 입력해 주세요." };
   }
   return { ok: true, username };
 }

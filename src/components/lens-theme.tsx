@@ -4,6 +4,12 @@ import { cn } from "@/lib/utils";
 
 const THEME_KEY = "lens-theme";
 const THEME_EVENT = "lens-theme-change";
+const THEME_COLOR_OVERRIDE_ID = "lens-theme-color-override";
+const THEME_COLOR_SELECTOR = 'meta[name="theme-color"]';
+export const lensLightThemeColor = "#fafafa";
+export const lensDarkThemeColor = "#101114";
+const lensThemeColors = { light: lensLightThemeColor, dark: lensDarkThemeColor };
+
 const THEMES = [
   { value: "system", label: "시스템", icon: Monitor },
   { value: "light", label: "라이트", icon: Sun },
@@ -12,7 +18,15 @@ const THEMES = [
 
 export const initializeLensTheme = `try {
   var theme = localStorage.getItem(${JSON.stringify(THEME_KEY)});
-  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  if (theme === "light" || theme === "dark") {
+    document.documentElement.dataset.theme = theme;
+    var colors = ${JSON.stringify(lensThemeColors)};
+    var meta = document.createElement("meta");
+    meta.id = ${JSON.stringify(THEME_COLOR_OVERRIDE_ID)};
+    meta.name = "theme-color";
+    meta.content = colors[theme];
+    document.head.insertBefore(meta, document.head.querySelector(${JSON.stringify(THEME_COLOR_SELECTOR)}));
+  }
 } catch {}`;
 
 function getTheme() {
@@ -36,9 +50,28 @@ function subscribe(onChange: () => void) {
 }
 
 function applyTheme(theme: string | null) {
-  if (theme === "light" || theme === "dark")
-    document.documentElement.dataset.theme = theme;
-  else delete document.documentElement.dataset.theme;
+  const override = theme === "light" || theme === "dark" ? theme : null;
+  const current = document.head.querySelector<HTMLMetaElement>(
+    `#${THEME_COLOR_OVERRIDE_ID}`,
+  );
+  if (!override) {
+    delete document.documentElement.dataset.theme;
+    current?.remove();
+    return;
+  }
+
+  document.documentElement.dataset.theme = override;
+  const meta = current ?? document.createElement("meta");
+  meta.content = lensThemeColors[override];
+  if (current) return;
+
+  // The first matching tag wins. The fallback tags stay managed by React.
+  meta.id = THEME_COLOR_OVERRIDE_ID;
+  meta.name = "theme-color";
+  document.head.insertBefore(
+    meta,
+    document.head.querySelector(THEME_COLOR_SELECTOR),
+  );
 }
 
 function changeTheme(theme: (typeof THEMES)[number]["value"]) {

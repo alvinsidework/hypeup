@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  USERNAME_RE,
   buildDealRecord,
   canPropose,
   canonicalJson,
@@ -32,6 +34,26 @@ describe("username", () => {
     assert.equal(validateUsername("lens").ok, false);
     assert.equal(validateUsername("a.b").ok, false);
     assert.equal(suggestUsername("Hype.Up_1"), "hype-up-1");
+  });
+
+  it("explains app route collisions and rejects them in username suggestions", () => {
+    assert.deepEqual(validateUsername(" Contacts "), {
+      ok: false,
+      error: "Lens에서 사용하는 주소예요. 다른 주소를 입력해 주세요.",
+    });
+    assert.equal(suggestUsername("contacts"), "");
+  });
+
+  it("reserves every static app route prefix that could be a public username", () => {
+    const routeTree = readFileSync(new URL("../../routeTree.gen.ts", import.meta.url), "utf8");
+    const prefixes = new Set(
+      Array.from(routeTree.matchAll(/\bfullPath:\s*['"]\/([^/'"]+)/g), ([, prefix]) => prefix.toLowerCase())
+        .filter((prefix) => USERNAME_RE.test(prefix)),
+    );
+    assert.ok(prefixes.has("contacts") && prefixes.has("api"), "could not read generated route paths");
+    for (const prefix of prefixes) {
+      assert.equal(validateUsername(prefix).ok, false, `/${prefix} conflicts with the app routes`);
+    }
   });
 });
 

@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUp, ChevronDown, FileText, MessageCircle } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronDown,
+  FileText,
+  LoaderCircle,
+  MessageCircle,
+} from "lucide-react";
+import { toast } from "sonner";
 import { LensConfirm } from "@/components/lens-confirm";
 import { Field, ghostBtn, inputClass, primaryBtn } from "@/components/lens-ui";
 import { relativeTime } from "@/lib/hypeup/format";
@@ -69,6 +76,8 @@ export function LensChat({
   onAction: (action: LensAction) => Promise<void>;
 }) {
   const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const sendPending = useRef(false);
   const logRef = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
   const latest = desk.messages.at(-1);
@@ -83,6 +92,25 @@ export function LensChat({
       log.scrollTop = log.scrollHeight;
     }
   }, [latest, role]);
+
+  async function sendMessage() {
+    const draft = body;
+    const message = draft.trim();
+    if (busy || sendPending.current || !message) return;
+
+    sendPending.current = true;
+    setSending(true);
+    try {
+      if (await onSend(message)) {
+        setBody((currentBody) => (currentBody === draft ? "" : currentBody));
+      }
+    } catch {
+      toast.error("메시지를 보내지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      sendPending.current = false;
+      setSending(false);
+    }
+  }
 
   return (
     <div className="@container">
@@ -156,15 +184,7 @@ export function LensChat({
             className="flex items-end gap-2 border-t border-border px-3 py-3 sm:px-4"
             onSubmit={(event) => {
               event.preventDefault();
-              const sent = body;
-              const next = sent.trim();
-              if (busy || !next) return;
-              void onSend(next).then((success) => {
-                if (success)
-                  setBody((currentBody) =>
-                    currentBody === sent ? "" : currentBody,
-                  );
-              });
+              void sendMessage();
             }}
           >
             <textarea
@@ -174,15 +194,35 @@ export function LensChat({
               rows={1}
               placeholder="메시지 입력"
               aria-label="메시지"
+              enterKeyHint="send"
               onChange={(event) => setBody(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key !== "Enter" ||
+                  event.shiftKey ||
+                  event.nativeEvent.isComposing ||
+                  event.nativeEvent.keyCode === 229
+                )
+                  return;
+                event.preventDefault();
+                if (!event.repeat) event.currentTarget.form?.requestSubmit();
+              }}
             />
             <button
               className="lens-button lens-button-primary min-w-12 shrink-0 !px-0"
               type="submit"
-              aria-label={busy ? "처리 중" : "보내기"}
-              disabled={busy || !body.trim()}
+              aria-label={sending ? "메시지 보내는 중" : "보내기"}
+              aria-busy={sending}
+              disabled={busy || sending || !body.trim()}
             >
-              <ArrowUp className="size-5" aria-hidden />
+              {sending ? (
+                <LoaderCircle
+                  className="size-5 motion-safe:animate-spin"
+                  aria-hidden
+                />
+              ) : (
+                <ArrowUp className="size-5" aria-hidden />
+              )}
             </button>
           </form>
         </section>

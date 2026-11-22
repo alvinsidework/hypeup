@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, MessageCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  LoaderCircle,
+  MessageCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { LensChat } from "@/components/lens-chat";
 import { Field, inputClass, primaryBtn } from "@/components/lens-ui";
@@ -50,6 +55,7 @@ function InquiryFlow({ data }: { data: Inquiry }) {
   const [step, setStep] = useState<"gate" | "form">("gate");
   const [desk, setDesk] = useState<ThreadDesk | null>(data.desk);
   const [busy, setBusy] = useState(false);
+  const requestPending = useRef(false);
   const [form, setForm] = useState({
     contactName: "",
     company: "",
@@ -59,7 +65,8 @@ function InquiryFlow({ data }: { data: Inquiry }) {
   });
 
   async function update(request: () => Promise<Update>) {
-    if (busy) return false;
+    if (requestPending.current) return false;
+    requestPending.current = true;
     setBusy(true);
     try {
       const result = await request();
@@ -73,6 +80,7 @@ function InquiryFlow({ data }: { data: Inquiry }) {
       toast.error("요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return false;
     } finally {
+      requestPending.current = false;
       setBusy(false);
     }
   }
@@ -243,8 +251,15 @@ function InquiryFlow({ data }: { data: Inquiry }) {
               <button
                 className={`${primaryBtn} flex-1`}
                 disabled={busy}
+                aria-busy={busy}
                 type="submit"
               >
+                {busy ? (
+                  <LoaderCircle
+                    className="size-4 shrink-0 motion-safe:animate-spin"
+                    aria-hidden
+                  />
+                ) : null}
                 {busy ? "대화를 여는 중…" : "대화 시작"}
               </button>
             </div>

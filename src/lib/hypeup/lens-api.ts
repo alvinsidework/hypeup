@@ -419,9 +419,10 @@ export const getLensInquiries = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireUser();
     const page = await getPage(user.id);
+    const address = page?.isPublic ? validateUsername(page.username) : null;
     return {
       items: await listInquiries(user.id, data.archived),
-      publicPath: page?.isPublic && page.username ? `/${page.username}` : "",
+      publicPath: address?.ok ? `/${address.username}` : "",
     };
   });
 

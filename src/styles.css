@@ -467,18 +467,6 @@
     padding-inline: 0;
   }
 
-  .lens-workspace-header[data-compact="true"][data-has-back="false"]
-    .lens-workspace-actions {
-    width: 100%;
-    margin-inline-start: 0;
-    justify-content: space-between;
-  }
-
-  .lens-workspace-header[data-compact="true"][data-has-back="false"]
-    .lens-workspace-menu {
-    order: -1;
-  }
-
   .lens-compact-content {
     padding-top: 1rem;
   }

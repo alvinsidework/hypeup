@@ -236,7 +236,6 @@ export function AppShell({
         <header
           className="lens-workspace-header sticky top-0 z-30 border-b border-border bg-bg pt-[env(safe-area-inset-top)]"
           data-compact={compact}
-          data-has-back={Boolean(back)}
         >
           <div className="lens-workspace-toolbar mx-auto flex min-h-[68px] max-w-[1152px] items-center gap-4 px-4 sm:px-8 lg:min-h-[76px]">
             {back ? (
@@ -269,7 +268,7 @@ export function AppShell({
               <LogoMark className="size-8" />
               <Wordmark />
             </Link>
-            <div className="lens-workspace-actions ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
               <PwaInstallButton />
               <Dialog.Trigger asChild>
                 <button

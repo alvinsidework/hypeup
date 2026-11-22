@@ -1,5 +1,5 @@
 import { formPost, graphGet, graphRawGet } from "./client";
-import { isUnsupportedMethod, normalizeAuthCode } from "./oauth-parse.ts";
+import { isLongLivedExchangeRejected, normalizeAuthCode } from "./oauth-parse.ts";
 import type { IgProfile, LongTokenResponse, ShortTokenResponse } from "./types";
 
 export const OAUTH_SCOPES = [
@@ -8,7 +8,13 @@ export const OAUTH_SCOPES = [
   "instagram_business_manage_messages",
 ].join(",");
 
-export { isProfessionalAccount, isUnsupportedMethod, normalizeAuthCode, parseGrantedScopes } from "./oauth-parse.ts";
+export {
+  isLongLivedExchangeRejected,
+  isProfessionalAccount,
+  isUnsupportedMethod,
+  normalizeAuthCode,
+  parseGrantedScopes,
+} from "./oauth-parse.ts";
 
 export function authorizeUrl(input: {
   appId: string;
@@ -64,18 +70,19 @@ export async function exchangeLongLivedToken(input: {
     client_secret: input.appSecret,
     access_token: input.shortLived,
   };
-  // Instagram documents this as GET, then rejects GET with
-  // "Unsupported request - method type: get". Send the secret in a POST body.
-  try {
-    return await formPost<LongTokenResponse>("https://graph.instagram.com/access_token", form);
-  } catch (error) {
-    if (!isUnsupportedMethod(error)) throw error;
-  }
+  // Meta documents this as GET. POST is "not supported" and comes back as
+  // "Object with ID 'access_token' does not exist". GET can still answer
+  // "Unsupported request - method type: get", so try the body form after that.
   const url = new URL("https://graph.instagram.com/access_token");
   url.searchParams.set("grant_type", form.grant_type);
   url.searchParams.set("client_secret", form.client_secret);
   url.searchParams.set("access_token", form.access_token);
-  return graphRawGet<LongTokenResponse>(url.toString());
+  try {
+    return await graphRawGet<LongTokenResponse>(url.toString());
+  } catch (error) {
+    if (!isLongLivedExchangeRejected(error)) throw error;
+  }
+  return formPost<LongTokenResponse>("https://graph.instagram.com/access_token", form);
 }
 
 export async function refreshLongLivedToken(token: string): Promise<LongTokenResponse> {

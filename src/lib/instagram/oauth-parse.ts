@@ -6,6 +6,15 @@ export function isUnsupportedMethod(error: unknown): boolean {
   return error instanceof Error && /unsupported request - method type/i.test(error.message);
 }
 
+/** Instagram sometimes answers the long-lived exchange with a fake method or object error. */
+export function isLongLivedExchangeRejected(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    isUnsupportedMethod(error) ||
+    /object with id ['"]access_token['"]/i.test(error.message)
+  );
+}
+
 export function isProfessionalAccount(accountType: string | undefined): boolean {
   if (!accountType) return true;
   const normalized = accountType.toUpperCase();

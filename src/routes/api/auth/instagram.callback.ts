@@ -16,6 +16,7 @@ import {
   exchangeLongLivedToken,
   exchangeShortLivedToken,
   fetchMe,
+  isLongLivedExchangeRejected,
   isProfessionalAccount,
   isUnsupportedMethod,
   parseGrantedScopes,
@@ -86,7 +87,7 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
             accessToken = longLived.access_token;
             expiresIn = longLived.expires_in ?? 60 * 60 * 24 * 60;
           } catch (exchangeError) {
-            if (!isUnsupportedMethod(exchangeError)) throw exchangeError;
+            if (!isLongLivedExchangeRejected(exchangeError)) throw exchangeError;
             console.error("[hypeup] long-lived token exchange rejected, continuing with the short-lived token");
           }
           const me = await fetchMe(accessToken);
@@ -141,6 +142,9 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
           }
           if (/redirect/i.test(message)) {
             return connectError(request, "redirect_mismatch", message, [clearState]);
+          }
+          if (isLongLivedExchangeRejected(err)) {
+            return connectError(request, "token_exchange", undefined, [clearState]);
           }
           if (/role|tester|not authorized|permissions/i.test(message)) {
             return connectError(request, "not_tester", message, [clearState]);

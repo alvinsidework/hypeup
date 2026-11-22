@@ -1,11 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isProfessionalAccount, isUnsupportedMethod, normalizeAuthCode, parseGrantedScopes } from "./oauth-parse.ts";
+import {
+  isLongLivedExchangeRejected,
+  isProfessionalAccount,
+  isUnsupportedMethod,
+  normalizeAuthCode,
+  parseGrantedScopes,
+} from "./oauth-parse.ts";
 
 test("recognizes Instagram's misleading method rejection", () => {
   assert.equal(isUnsupportedMethod(new Error("Unsupported request - method type: get")), true);
   assert.equal(isUnsupportedMethod(new Error("Unsupported request - method type: post")), true);
   assert.equal(isUnsupportedMethod(new Error("invalid code")), false);
+});
+
+test("treats the access_token object error as a failed long-lived exchange", () => {
+  const message =
+    "unsupported post request. Object with ID 'access_token' does not exist, cannot be loaded due to missing permissions, or does not support this operation";
+  assert.equal(isLongLivedExchangeRejected(new Error(message)), true);
+  assert.equal(isLongLivedExchangeRejected(new Error("Unsupported request - method type: get")), true);
+  assert.equal(isLongLivedExchangeRejected(new Error("invalid code")), false);
 });
 
 test("strips Instagram #_ suffix from the auth code", () => {

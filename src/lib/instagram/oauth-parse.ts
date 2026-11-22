@@ -10,6 +10,12 @@ export function isAuthorizationCodeUsed(error: unknown): boolean {
   );
 }
 
+export function isTesterRoleRejected(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.replace(/_/g, " ");
+  return /\binsufficient developer role\b|\b(?:user|account) (?:is not|isn't) (?:an? )?(?:instagram |app )?tester\b|\b(?:user|account) does not have (?:a|an|the required) (?:app )?role on this app\b/i.test(message);
+}
+
 export function isUnsupportedMethod(error: unknown): boolean {
   return error instanceof Error && /unsupported request - method type/i.test(error.message);
 }

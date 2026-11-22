@@ -35,6 +35,7 @@ import {
   isProfessionalAccount,
   parseGrantedScopes,
 } from "@/lib/instagram/oauth";
+import { isTesterRoleRejected } from "@/lib/instagram/oauth-parse";
 import { subscribeApps } from "@/lib/instagram/messages";
 import { graphErrorPayload, InstagramApiError } from "@/lib/instagram/errors";
 
@@ -92,17 +93,30 @@ async function waitForOAuthAttempt(proof: string) {
   return { status: "pending" } as const;
 }
 
-function exchangeErrorCode(err: unknown): string {
+type OAuthStage =
+  "authorization" | "short_token" | "long_token" | "profile" | "setup";
+
+function oauthFailureCode(err: unknown, stage: OAuthStage): string {
+  const message = err instanceof Error ? err.message : "";
+  if (stage === "setup") {
+    return /APP_ENCRYPTION_KEY|AUTH_SECRET/i.test(message)
+      ? "missing_keys"
+      : "oauth_retry";
+  }
   if (isAuthorizationCodeUsed(err)) return "code_used";
   if (err instanceof InstagramApiError && err.status === 429)
     return "rate_limited";
-  const message = err instanceof Error ? err.message : "";
-  if (/APP_ENCRYPTION_KEY|AUTH_SECRET/i.test(message)) return "missing_keys";
-  if (/redirect/i.test(message)) return "redirect_mismatch";
-  if (isLongLivedExchangeRejected(err)) return "token_exchange";
-  if (/role|tester|not authorized|permissions/i.test(message))
-    return "not_tester";
-  return "denied";
+  if (isTesterRoleRejected(err)) return "not_tester";
+  if (/redirect[ _-]?uri|redirect[ _-]?url/i.test(message))
+    return "redirect_mismatch";
+  if (stage === "authorization") return "denied";
+  if (
+    err instanceof InstagramApiError &&
+    (stage === "short_token" || stage === "long_token")
+  ) {
+    return "token_exchange";
+  }
+  return "oauth_retry";
 }
 
 async function finishAccountConnection(
@@ -114,6 +128,7 @@ async function finishAccountConnection(
   appSecret: string,
   clearState: string,
 ) {
+  let stage: OAuthStage = "short_token";
   try {
     const shortLived = await exchangeShortLivedToken({
       appId,
@@ -123,6 +138,7 @@ async function finishAccountConnection(
     });
     let accessToken = shortLived.access_token;
     let expiresIn = 60 * 60;
+    stage = "long_token";
     try {
       const longLived = await exchangeLongLivedToken({
         appSecret,
@@ -137,11 +153,13 @@ async function finishAccountConnection(
       );
     }
 
+    stage = "profile";
     const me = await fetchMe(accessToken);
     if (!isProfessionalAccount(me.account_type)) {
       await failOAuthAttempt(proof, "personal_account");
       return connectError(request, client, "personal_account", [clearState]);
     }
+    stage = "setup";
     const igUserId = String(me.user_id ?? me.id ?? shortLived.user_id);
     const user = await upsertUser({
       igUserId,
@@ -188,8 +206,8 @@ async function finishAccountConnection(
 
     return connected(request, client, session, clearState);
   } catch (error) {
-    const failure = exchangeErrorCode(error);
-    console.error("[hypeup] Instagram OAuth failed", failure);
+    const failure = oauthFailureCode(error, stage);
+    console.error("[hypeup] Instagram OAuth failed", stage, failure);
     await failOAuthAttempt(proof, failure).catch(() => {
       console.error("[hypeup] Instagram OAuth failure could not be recorded");
     });
@@ -235,11 +253,11 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
         const clearState = cookieHeader(OAUTH_STATE_COOKIE, "", request, 0);
         if (url.searchParams.has("error") || (!code && !resumeCount)) {
           const providerError = new Error(
-            url.searchParams.get("error_description") ?? "",
+            ["error_description", "error_reason", "error"]
+              .map((key) => url.searchParams.get(key))
+              .join(" "),
           );
-          const failure = isAuthorizationCodeUsed(providerError)
-            ? "code_used"
-            : "denied";
+          const failure = oauthFailureCode(providerError, "authorization");
           return connectError(request, client, failure, [clearState]);
         }
 

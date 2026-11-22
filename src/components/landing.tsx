@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { AccessRequestDialog } from "@/components/access-request-dialog";
 import { DemoEntryButton } from "@/components/demo-entry-button";
-import { InstagramConnectLink } from "@/components/instagram-connect-link";
 import { PublicLayout } from "@/components/public-layout";
 import { copy } from "@/lib/hypeup/copy";
 
@@ -46,9 +45,13 @@ export function Landing({ demoMode }: { demoMode: boolean }) {
             {demoMode ? (
               <DemoEntryButton />
             ) : (
-              <InstagramConnectLink className="lens-button lens-button-secondary">
+              <Link
+                to="/connect"
+                search={{ error: undefined, detail: undefined }}
+                className="lens-button lens-button-secondary"
+              >
                 {copy.alreadyTester}
-              </InstagramConnectLink>
+              </Link>
             )}
           </div>
           <p className="mt-4 text-sm leading-6 text-muted [word-break:keep-all]">

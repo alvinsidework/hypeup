@@ -5,13 +5,13 @@ export const copy = {
     "프로페셔널 계정으로 연결하면 설정한 키워드에 맞춰 공개 대댓글과 DM을 보냅니다.",
   connectHeadline: "내 인스타그램으로 대시보드 연결",
   connectBody:
-    "Business Login으로 본인 프로페셔널 계정만 연결합니다. Lens는 비밀번호를 받지 않습니다.",
+    "초대를 수락한 비즈니스 또는 크리에이터 계정으로 연결할 수 있어요.",
   professionalHint:
     "개인 계정은 API 대상이 아닙니다. Instagram 설정에서 비즈니스 또는 크리에이터로 전환하세요.",
-  continueWithInstagram: "Instagram으로 계속",
+  continueWithInstagram: "Instagram 연결하기",
   applyForAccess: "사용 신청하기",
   applyHint: "신청하시면 테스터 등록 후 수락 링크를 메일로 보내 드립니다.",
-  alreadyTester: "이미 테스터라면 연결",
+  alreadyTester: "초대받은 계정 연결",
   browseDemo: "데모 둘러보기",
   demoBanner: "DEMO — Instagram 미연결",
   demoHint: "Instagram App ID가 없어 데모 데이터로 화면을 보여줍니다.",
@@ -39,14 +39,14 @@ export const copy = {
   resubscribe: "다시 구독",
   personalAccount:
     "프로페셔널 계정만 연결할 수 있습니다. Instagram 설정에서 비즈니스 또는 크리에이터로 전환하세요.",
-  notTester: "Meta 앱 역할에 이 계정을 테스터로 추가해야 합니다.",
+  notTester: "이 계정에 Instagram 테스터 권한이 확인되지 않았어요.",
   redirectMismatch: "Instagram 앱의 OAuth redirect URI가 이 주소와 정확히 같아야 합니다.",
   dmDuplicate: "이 댓글에는 이미 DM을 보냈습니다. (댓글당 1통)",
   dmExpired: "댓글 후 7일이 지나 DM을 보낼 수 없습니다.",
   rateLimited: "Instagram 요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
   denied: "Instagram에서 권한 요청을 취소했거나, 앱이 요청한 권한을 받을 수 없습니다.",
   tokenExchange:
-    "인스타그램이 이 계정의 토큰 발급을 거절했습니다. 앱 역할에서 인스타그램 테스터로 초대를 수락한 계정인지 확인해 주세요.",
+    "Instagram이 이 연결의 토큰 발급을 거절했어요.",
   missingKeys: "APP_ENCRYPTION_KEY와 AUTH_SECRET을 .env.local에 64자리 hex로 채운 뒤 앱을 다시 시작하세요.",
   genericError: "요청을 처리하지 못했습니다. 잠시 후 다시 시도하세요.",
   nav: {

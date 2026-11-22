@@ -191,6 +191,107 @@ test("Instagram callback claims and recovers an attempt across concurrent reques
         assert.equal(shortExchanges, 1);
       },
     );
+
+    await t.test(
+      "only explicit tester-role rejections ask the user to check the invite",
+      async (t) => {
+        const { Route: startRoute } = await server.ssrLoadModule(
+          "/src/routes/api/auth/instagram.ts",
+        );
+        const { Route: callbackRoute } = await server.ssrLoadModule(
+          "/src/routes/api/auth/instagram.callback.ts",
+        );
+        const start = startRoute.options.server.handlers.GET;
+        const callback = callbackRoute.options.server.handlers.GET;
+        const origin = "https://lens.test";
+        const providerCalls = [];
+        const tokenErrors = new Map([
+          ["need-role", "Insufficient Developer Role"],
+          [
+            "scope-error",
+            "The request is not authorized due to missing permissions",
+          ],
+        ]);
+
+        t.mock.method(globalThis, "fetch", async (input, init) => {
+          const url = new URL(input);
+          providerCalls.push(url.pathname);
+          if (url.hostname === "api.instagram.com") {
+            const code = init.body.get("code");
+            const message = tokenErrors.get(code);
+            if (message)
+              return Response.json({ error_message: message }, { status: 400 });
+            assert.equal(code, "profile-error");
+            return Response.json({
+              access_token: "test-short-token",
+              user_id: "test-account",
+            });
+          }
+          assert.equal(url.hostname, "graph.instagram.com");
+          if (url.pathname === "/access_token")
+            return Response.json({ access_token: "test-long-token" });
+          assert.ok(url.pathname.endsWith("/me"));
+          return Response.json(
+            { error: { message: "Missing profile permissions", code: 10 } },
+            { status: 400 },
+          );
+        });
+
+        async function expectFailure(params, expected) {
+          const started = await start({
+            request: new Request(origin + "/api/auth/instagram"),
+          });
+          const state = new URL(
+            started.headers.get("location"),
+          ).searchParams.get("state");
+          const cookie = started.headers.getSetCookie()[0].split(";", 1)[0];
+          const url = new URL("/api/auth/instagram/callback", origin);
+          url.search = new URLSearchParams({ state, ...params }).toString();
+          const response = await callback({
+            request: new Request(url, { headers: { cookie } }),
+          });
+          assert.equal(
+            response.headers.get("location"),
+            origin + "/connect?error=" + expected,
+          );
+          assert.match(
+            response.headers.getSetCookie()[0],
+            /^hypeup_oauth_state=;.*Max-Age=0/,
+          );
+          assert.equal(response.headers.getSetCookie().length, 1);
+        }
+
+        await expectFailure(
+          {
+            error: "access_denied",
+            error_reason: "insufficient_developer_role",
+          },
+          "not_tester",
+        );
+        await expectFailure(
+          {
+            error: "access_denied",
+            error_description: "Insufficient Developer Role",
+          },
+          "not_tester",
+        );
+        await expectFailure(
+          {
+            error: "access_denied",
+            error_description: "Permissions not granted",
+          },
+          "denied",
+        );
+        assert.deepEqual(providerCalls, []);
+        await expectFailure({ code: "need-role" }, "not_tester");
+        await expectFailure({ code: "scope-error" }, "token_exchange");
+        await expectFailure({ code: "profile-error" }, "oauth_retry");
+        assert.equal(
+          providerCalls.filter((path) => path === "/oauth/access_token").length,
+          3,
+        );
+      },
+    );
   } finally {
     await Promise.all([server.close(), pglite?.close()]);
   }

@@ -1,3 +1,5 @@
+import { TESTER_ACCEPT_URL } from "./instagram-tester";
+
 type NativeCapacitor = {
   isNativePlatform?: () => boolean;
 };
@@ -17,14 +19,21 @@ export function lensAuthStartUrl(): string {
   return url.toString();
 }
 
-export async function openInstagramLogin(): Promise<void> {
-  const target = lensAuthStartUrl();
+async function openExternalPage(target: string): Promise<void> {
   try {
     const { Browser } = await import("@capacitor/browser");
     await Browser.open({ url: target });
   } catch {
     window.open(target, "_blank", "noopener");
   }
+}
+
+export function openInstagramLogin(): Promise<void> {
+  return openExternalPage(lensAuthStartUrl());
+}
+
+export function openInstagramTesterInvites(): Promise<void> {
+  return openExternalPage(TESTER_ACCEPT_URL);
 }
 
 export async function listenForLensAuthReturn(): Promise<() => void> {

@@ -27,7 +27,8 @@ test("reply block contains the tester accept link and not the admin dashboard", 
   const reply = replyBody(mail.text);
   assert.match(mail.subject, /@studio\.han/);
   assert.match(reply, new RegExp(TESTER_ACCEPT_URL.replace(/[.]/g, "\\.")));
-  assert.match(reply, /https:\/\/hypeupinsta\.vercel\.app/);
+  assert.match(reply, /테스터 초대\(Tester Invites\)/);
+  assert.match(reply, /https:\/\/hypeupinsta\.vercel\.app\/connect/);
   assert.doesNotMatch(reply, /developers\.facebook\.com/);
   assert.match(mail.text, /https:\/\/developers\.facebook\.com\/apps\/123456\/roles\/roles\//);
   assert.match(mail.text, /guest@example.com/);

@@ -1,5 +1,6 @@
-/** Instagram → Settings → Apps and websites → Tester Invites. */
-export const TESTER_ACCEPT_URL = "https://www.instagram.com/accounts/manage_access/";
+import { TESTER_ACCEPT_URL } from "./instagram-tester.ts";
+
+export { TESTER_ACCEPT_URL } from "./instagram-tester.ts";
 
 const REPLY_START = "──────── 회신용 본문 (이 줄 다음부터 구분선 직전만 복사) ────────";
 const REPLY_END = "──────── 회신용 본문 끝 ────────";
@@ -103,14 +104,13 @@ export function composeAccessRequestEmail(input: {
     `@${input.instagram} 계정을 테스터로 등록했습니다.`,
     "아래 페이지에서 초대를 수락해 주세요.",
     "",
-    "테스터 초대 수락",
+    "1. 웹 브라우저에서 테스터 초대 수락",
     TESTER_ACCEPT_URL,
     "",
-    `인스타그램에 @${input.instagram} 로 로그인한 뒤, Tester Invites(테스터 초대)에서 앱을 수락하면 됩니다.`,
-    "앱에서는 설정 및 활동 → 웹사이트 권한 → 테스터 초대로 들어가면 같은 화면입니다.",
+    `인스타그램에 @${input.instagram} 계정으로 로그인한 뒤, 앱 및 웹사이트의 ‘테스터 초대(Tester Invites)’ 탭에서 초대를 수락해 주세요.`,
     "",
-    "수락한 다음 여기서 프로페셔널 계정으로 연결해 주세요.",
-    input.appUrl,
+    "2. Lens로 돌아와 같은 계정으로 연결",
+    new URL("/connect", input.appUrl).href,
     "",
     "개인 계정은 연결되지 않습니다. 비즈니스 또는 크리에이터로 바꾼 뒤 다시 시도해 주세요.",
   ].join("\n");

@@ -27,6 +27,7 @@ import { Route as AppPortfolioRouteImport } from './routes/_app.portfolio'
 import { Route as AppPostsRouteImport } from './routes/_app.posts'
 import { Route as AppRatesRouteImport } from './routes/_app.rates'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as BrandIndexRouteImport } from './routes/brand.index'
 import { Route as AppDealsIdRouteImport } from './routes/_app.deals.$id'
 import { Route as AppInquiriesIndexRouteImport } from './routes/_app.inquiries.index'
 import { Route as AppInquiriesIdRouteImport } from './routes/_app.inquiries.$id'
@@ -39,6 +40,11 @@ import { Route as ApiCronRefreshTokensRouteImport } from './routes/api/cron/refr
 import { Route as ApiInstagramSyncRouteImport } from './routes/api/instagram/sync'
 import { Route as ApiLensProfilePhotoRouteImport } from './routes/api/lens/profile-photo'
 import { Route as ApiWebhooksInstagramRouteImport } from './routes/api/webhooks/instagram'
+import { Route as BrandContractIdRouteImport } from './routes/brand.contract.$id'
+import { Route as BrandInquiriesIdRouteImport } from './routes/brand.inquiries.$id'
+import { Route as ApiAuthBrandLogoutRouteImport } from './routes/api/auth/brand.logout'
+import { Route as ApiAuthBrandStartRouteImport } from './routes/api/auth/brand.start'
+import { Route as ApiAuthBrandVerifyRouteImport } from './routes/api/auth/brand.verify'
 import { Route as ApiAuthInstagramCallbackRouteImport } from './routes/api/auth/instagram.callback'
 import { Route as ApiAuthInstagramHandoffRouteImport } from './routes/api/auth/instagram.handoff'
 
@@ -131,6 +137,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const BrandIndexRoute = BrandIndexRouteImport.update({
+  id: '/brand/',
+  path: '/brand/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppDealsIdRoute = AppDealsIdRouteImport.update({
   id: '/deals/$id',
   path: '/deals/$id',
@@ -191,6 +202,31 @@ const ApiWebhooksInstagramRoute = ApiWebhooksInstagramRouteImport.update({
   path: '/api/webhooks/instagram',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BrandContractIdRoute = BrandContractIdRouteImport.update({
+  id: '/brand/contract/$id',
+  path: '/brand/contract/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrandInquiriesIdRoute = BrandInquiriesIdRouteImport.update({
+  id: '/brand/inquiries/$id',
+  path: '/brand/inquiries/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthBrandLogoutRoute = ApiAuthBrandLogoutRouteImport.update({
+  id: '/api/auth/brand/logout',
+  path: '/api/auth/brand/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthBrandStartRoute = ApiAuthBrandStartRouteImport.update({
+  id: '/api/auth/brand/start',
+  path: '/api/auth/brand/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthBrandVerifyRoute = ApiAuthBrandVerifyRouteImport.update({
+  id: '/api/auth/brand/verify',
+  path: '/api/auth/brand/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthInstagramCallbackRoute =
   ApiAuthInstagramCallbackRouteImport.update({
     id: '/callback',
@@ -221,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/posts': typeof AppPostsRouteWithChildren
   '/rates': typeof AppRatesRoute
   '/settings': typeof AppSettingsRoute
+  '/brand/': typeof BrandIndexRoute
   '/deals/$id': typeof AppDealsIdRoute
   '/inquiries/$id': typeof AppInquiriesIdRoute
   '/page/preview': typeof AppPagePreviewRoute
@@ -231,8 +268,13 @@ export interface FileRoutesByFullPath {
   '/api/instagram/sync': typeof ApiInstagramSyncRoute
   '/api/lens/profile-photo': typeof ApiLensProfilePhotoRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/brand/contract/$id': typeof BrandContractIdRoute
+  '/brand/inquiries/$id': typeof BrandInquiriesIdRoute
   '/inquiries/': typeof AppInquiriesIndexRoute
   '/posts/': typeof AppPostsIndexRoute
+  '/api/auth/brand/logout': typeof ApiAuthBrandLogoutRoute
+  '/api/auth/brand/start': typeof ApiAuthBrandStartRoute
+  '/api/auth/brand/verify': typeof ApiAuthBrandVerifyRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
   '/api/auth/instagram/handoff': typeof ApiAuthInstagramHandoffRoute
 }
@@ -252,6 +294,7 @@ export interface FileRoutesByTo {
   '/portfolio': typeof AppPortfolioRoute
   '/rates': typeof AppRatesRoute
   '/settings': typeof AppSettingsRoute
+  '/brand': typeof BrandIndexRoute
   '/deals/$id': typeof AppDealsIdRoute
   '/inquiries/$id': typeof AppInquiriesIdRoute
   '/page/preview': typeof AppPagePreviewRoute
@@ -262,8 +305,13 @@ export interface FileRoutesByTo {
   '/api/instagram/sync': typeof ApiInstagramSyncRoute
   '/api/lens/profile-photo': typeof ApiLensProfilePhotoRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/brand/contract/$id': typeof BrandContractIdRoute
+  '/brand/inquiries/$id': typeof BrandInquiriesIdRoute
   '/inquiries': typeof AppInquiriesIndexRoute
   '/posts': typeof AppPostsIndexRoute
+  '/api/auth/brand/logout': typeof ApiAuthBrandLogoutRoute
+  '/api/auth/brand/start': typeof ApiAuthBrandStartRoute
+  '/api/auth/brand/verify': typeof ApiAuthBrandVerifyRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
   '/api/auth/instagram/handoff': typeof ApiAuthInstagramHandoffRoute
 }
@@ -287,6 +335,7 @@ export interface FileRoutesById {
   '/_app/posts': typeof AppPostsRouteWithChildren
   '/_app/rates': typeof AppRatesRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/brand/': typeof BrandIndexRoute
   '/_app/deals/$id': typeof AppDealsIdRoute
   '/_app/inquiries/$id': typeof AppInquiriesIdRoute
   '/_app/page_/preview': typeof AppPagePreviewRoute
@@ -297,8 +346,13 @@ export interface FileRoutesById {
   '/api/instagram/sync': typeof ApiInstagramSyncRoute
   '/api/lens/profile-photo': typeof ApiLensProfilePhotoRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
+  '/brand/contract/$id': typeof BrandContractIdRoute
+  '/brand/inquiries/$id': typeof BrandInquiriesIdRoute
   '/_app/inquiries/': typeof AppInquiriesIndexRoute
   '/_app/posts/': typeof AppPostsIndexRoute
+  '/api/auth/brand/logout': typeof ApiAuthBrandLogoutRoute
+  '/api/auth/brand/start': typeof ApiAuthBrandStartRoute
+  '/api/auth/brand/verify': typeof ApiAuthBrandVerifyRoute
   '/api/auth/instagram/callback': typeof ApiAuthInstagramCallbackRoute
   '/api/auth/instagram/handoff': typeof ApiAuthInstagramHandoffRoute
 }
@@ -322,6 +376,7 @@ export interface FileRouteTypes {
     | '/posts'
     | '/rates'
     | '/settings'
+    | '/brand/'
     | '/deals/$id'
     | '/inquiries/$id'
     | '/page/preview'
@@ -332,8 +387,13 @@ export interface FileRouteTypes {
     | '/api/instagram/sync'
     | '/api/lens/profile-photo'
     | '/api/webhooks/instagram'
+    | '/brand/contract/$id'
+    | '/brand/inquiries/$id'
     | '/inquiries/'
     | '/posts/'
+    | '/api/auth/brand/logout'
+    | '/api/auth/brand/start'
+    | '/api/auth/brand/verify'
     | '/api/auth/instagram/callback'
     | '/api/auth/instagram/handoff'
   fileRoutesByTo: FileRoutesByTo
@@ -353,6 +413,7 @@ export interface FileRouteTypes {
     | '/portfolio'
     | '/rates'
     | '/settings'
+    | '/brand'
     | '/deals/$id'
     | '/inquiries/$id'
     | '/page/preview'
@@ -363,8 +424,13 @@ export interface FileRouteTypes {
     | '/api/instagram/sync'
     | '/api/lens/profile-photo'
     | '/api/webhooks/instagram'
+    | '/brand/contract/$id'
+    | '/brand/inquiries/$id'
     | '/inquiries'
     | '/posts'
+    | '/api/auth/brand/logout'
+    | '/api/auth/brand/start'
+    | '/api/auth/brand/verify'
     | '/api/auth/instagram/callback'
     | '/api/auth/instagram/handoff'
   id:
@@ -387,6 +453,7 @@ export interface FileRouteTypes {
     | '/_app/posts'
     | '/_app/rates'
     | '/_app/settings'
+    | '/brand/'
     | '/_app/deals/$id'
     | '/_app/inquiries/$id'
     | '/_app/page_/preview'
@@ -397,8 +464,13 @@ export interface FileRouteTypes {
     | '/api/instagram/sync'
     | '/api/lens/profile-photo'
     | '/api/webhooks/instagram'
+    | '/brand/contract/$id'
+    | '/brand/inquiries/$id'
     | '/_app/inquiries/'
     | '/_app/posts/'
+    | '/api/auth/brand/logout'
+    | '/api/auth/brand/start'
+    | '/api/auth/brand/verify'
     | '/api/auth/instagram/callback'
     | '/api/auth/instagram/handoff'
   fileRoutesById: FileRoutesById
@@ -412,12 +484,18 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   UsernameInquiryRoute: typeof UsernameInquiryRoute
+  BrandIndexRoute: typeof BrandIndexRoute
   ApiAuthInstagramRoute: typeof ApiAuthInstagramRouteWithChildren
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiCronRefreshTokensRoute: typeof ApiCronRefreshTokensRoute
   ApiInstagramSyncRoute: typeof ApiInstagramSyncRoute
   ApiLensProfilePhotoRoute: typeof ApiLensProfilePhotoRoute
   ApiWebhooksInstagramRoute: typeof ApiWebhooksInstagramRoute
+  BrandContractIdRoute: typeof BrandContractIdRoute
+  BrandInquiriesIdRoute: typeof BrandInquiriesIdRoute
+  ApiAuthBrandLogoutRoute: typeof ApiAuthBrandLogoutRoute
+  ApiAuthBrandStartRoute: typeof ApiAuthBrandStartRoute
+  ApiAuthBrandVerifyRoute: typeof ApiAuthBrandVerifyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -548,6 +626,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/brand/': {
+      id: '/brand/'
+      path: '/brand'
+      fullPath: '/brand/'
+      preLoaderRoute: typeof BrandIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/deals/$id': {
       id: '/_app/deals/$id'
       path: '/deals/$id'
@@ -630,6 +715,41 @@ declare module '@tanstack/react-router' {
       path: '/api/webhooks/instagram'
       fullPath: '/api/webhooks/instagram'
       preLoaderRoute: typeof ApiWebhooksInstagramRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/brand/contract/$id': {
+      id: '/brand/contract/$id'
+      path: '/brand/contract/$id'
+      fullPath: '/brand/contract/$id'
+      preLoaderRoute: typeof BrandContractIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/brand/inquiries/$id': {
+      id: '/brand/inquiries/$id'
+      path: '/brand/inquiries/$id'
+      fullPath: '/brand/inquiries/$id'
+      preLoaderRoute: typeof BrandInquiriesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/brand/logout': {
+      id: '/api/auth/brand/logout'
+      path: '/api/auth/brand/logout'
+      fullPath: '/api/auth/brand/logout'
+      preLoaderRoute: typeof ApiAuthBrandLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/brand/start': {
+      id: '/api/auth/brand/start'
+      path: '/api/auth/brand/start'
+      fullPath: '/api/auth/brand/start'
+      preLoaderRoute: typeof ApiAuthBrandStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/brand/verify': {
+      id: '/api/auth/brand/verify'
+      path: '/api/auth/brand/verify'
+      fullPath: '/api/auth/brand/verify'
+      preLoaderRoute: typeof ApiAuthBrandVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/instagram/callback': {
@@ -731,12 +851,18 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   UsernameInquiryRoute: UsernameInquiryRoute,
+  BrandIndexRoute: BrandIndexRoute,
   ApiAuthInstagramRoute: ApiAuthInstagramRouteWithChildren,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiCronRefreshTokensRoute: ApiCronRefreshTokensRoute,
   ApiInstagramSyncRoute: ApiInstagramSyncRoute,
   ApiLensProfilePhotoRoute: ApiLensProfilePhotoRoute,
   ApiWebhooksInstagramRoute: ApiWebhooksInstagramRoute,
+  BrandContractIdRoute: BrandContractIdRoute,
+  BrandInquiriesIdRoute: BrandInquiriesIdRoute,
+  ApiAuthBrandLogoutRoute: ApiAuthBrandLogoutRoute,
+  ApiAuthBrandStartRoute: ApiAuthBrandStartRoute,
+  ApiAuthBrandVerifyRoute: ApiAuthBrandVerifyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

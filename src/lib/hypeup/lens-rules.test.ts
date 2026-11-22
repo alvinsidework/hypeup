@@ -11,8 +11,10 @@ import {
   maskEmail,
   parseTerms,
   priceLabel,
+  proposalAddOnRows,
   suggestUsername,
   systemSentences,
+  termsToInput,
   transitionError,
   trustForEmail,
   trustLabel,
@@ -31,6 +33,7 @@ describe("username", () => {
     assert.equal(validateUsername("-mina").ok, false);
     assert.equal(validateUsername("mina-").ok, false);
     assert.equal(validateUsername("posts").ok, false);
+    assert.equal(validateUsername("brand").ok, false);
     assert.equal(validateUsername("lens").ok, false);
     assert.equal(validateUsername("a.b").ok, false);
     assert.equal(suggestUsername("Hype.Up_1"), "hype-up-1");
@@ -69,6 +72,8 @@ describe("trust and masking", () => {
 });
 
 describe("terms", () => {
+  const input = { title: "릴스 제안", format: "reel", model: "fixed", amountKrw: 300000 };
+
   it("keeps fixed, performance, and hybrid amounts apart", () => {
     const fixed = parseTerms({ title: "봄 자켓 릴스 1건", format: "reel", model: "fixed", amountKrw: 300000, revisions: 1 });
     assert.equal(fixed.ok, true);
@@ -89,6 +94,61 @@ describe("terms", () => {
     assert.equal(parseTerms({ title: "x".repeat(81), format: "reel", model: "fixed", amountKrw: 1 }).ok, false);
     assert.equal(priceLabel({ model: "fixed", amountKrw: 300000, rateBps: null, priceHidden: true }), "문의");
     assert.equal(usageLabel(0), "사용권 협의");
+  });
+
+  it("round trips selected add-ons without changing the base fee or legacy terms", () => {
+    const legacy = parseTerms(input);
+    assert.ok(legacy.ok);
+    assert.equal("addOns" in legacy.terms, false);
+    assert.deepEqual(proposalAddOnRows(legacy.terms.addOns), []);
+
+    const proposal = parseTerms({ ...input, addOns: {
+      collaboratorKrw: 30000,
+      youtubeRepostKrw: 50000,
+      tiktokRepostKrw: 40000,
+      secondaryUse: { months: 3, amountKrw: 110000 },
+      cleanCopyKrw: 0,
+      custom: [
+        { label: " 프로필 링크 ", details: " 24시간 유지 ", amountKrw: null },
+        { label: "썸네일", details: "", amountKrw: 10000 },
+      ],
+    } });
+    assert.ok(proposal.ok);
+    assert.equal(proposal.terms.pricing.fixed_amount_krw, 300000);
+    assert.deepEqual(parseTerms(termsToInput(proposal.terms)), proposal);
+    const rows = proposalAddOnRows(proposal.terms.addOns);
+    assert.deepEqual(rows.map((row) => [row.label, row.details, row.amountKrw]), [
+      ["공동작업자 등록", "", 30000],
+      ["YouTube 재업로드", "", 50000],
+      ["TikTok 재업로드", "", 40000],
+      ["클린본 제공", "", 0],
+      ["2차 활용", "3개월", 110000],
+      ["프로필 링크", "24시간 유지", null],
+      ["썸네일", "", 10000],
+    ]);
+
+    assert.deepEqual(parseTerms({ ...input, addOns: { custom: [] } }), legacy);
+  });
+
+  it("rejects malformed proposal data and incomplete selected add-ons without throwing", () => {
+    for (const malformed of [null, [], {}, { ...input, title: 1 }, { ...input, description: {} }, { ...input, paidAds: "false" }, { ...input, notes: [] }]) {
+      assert.equal(parseTerms(malformed).ok, false);
+    }
+    for (const addOns of [
+      [],
+      { collaboratorKrw: null },
+      { youtubeRepostKrw: -1 },
+      { tiktokRepostKrw: "5000" },
+      { cleanCopyKrw: 0.5 },
+      { secondaryUse: { months: 0, amountKrw: 2000 } },
+      { secondaryUse: { months: 2 } },
+      { custom: [null] },
+      { custom: [{ label: "  ", details: "" }] },
+      { custom: [{ label: "썸네일", details: 10 }] },
+      { custom: [{ label: "썸네일", details: "", amountKrw: Infinity }] },
+    ]) {
+      assert.equal(parseTerms({ ...input, addOns }).ok, false);
+    }
   });
 });
 
@@ -159,5 +219,38 @@ describe("record copy", () => {
     assert.match(canonicalJson(body), /입금을 확인한 것은 아닙니다/);
     assert.equal(JSON.stringify(body).includes("k***m@brand.co.kr"), true);
     assert.equal(JSON.stringify(body).includes("kim@"), false);
+  });
+
+  it("exports add-ons and contract details from finalized agreements only", () => {
+    const proposal = parseTerms({ title: "릴스", format: "reel", model: "fixed", amountKrw: 300000, addOns: { cleanCopyKrw: 25000 } });
+    assert.ok(proposal.ok);
+    const brandContract = {
+      kind: "company" as const,
+      legalName: "예시브랜드",
+      birthDate: "",
+      registrationNumber: "",
+      phone: "",
+      address: "",
+      signature: null,
+    };
+    const source = {
+      influencerName: "하나",
+      username: "mina",
+      company: "예시브랜드",
+      contactName: "김담당",
+      emailMasked: "k***m@brand.co.kr",
+      trustLabel: "회사 메일",
+      deal: {
+        id: "d1", status: "draft" as const, title: "릴스", terms: proposal.terms,
+        proposedBy: "brand" as const, postUrl: null, postedOn: null, postNote: null,
+        agreedAt: null, cancelRequestedBy: null, settlements: [], brandContract,
+      },
+      messages: [],
+    };
+    const draft = buildDealRecord(source);
+    assert.equal("brandContract" in draft.deal, false);
+    const agreed = buildDealRecord({ ...source, deal: { ...source.deal, status: "agreed", agreedAt: "2026-11-22T00:00:00.000Z" } });
+    assert.equal(agreed.deal.terms.addOns?.cleanCopyKrw, 25000);
+    assert.deepEqual(agreed.deal.brandContract, brandContract);
   });
 });

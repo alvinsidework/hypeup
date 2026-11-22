@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>Lens 브랜드 로그인 코드</title>
+    <style>
+      :root { color-scheme: light dark; supported-color-schemes: light dark; }
+      @media (prefers-color-scheme: dark) {
+        .lens-bg { background-color: #101114 !important; }
+        .lens-card { background-color: #191b20 !important; border-color: #2d3038 !important; }
+        .lens-title { color: #f4f5f7 !important; }
+        .lens-muted { color: #aaafba !important; }
+        .lens-code { background-color: #202c4b !important; }
+        .lens-code-text { color: #c5d3ff !important; }
+        .lens-footer { border-color: #2d3038 !important; }
+      }
+    </style>
+  </head>
+  <body class="lens-bg" style="margin: 0; padding: 0; background-color: #f0f1f4;">
+    <div aria-hidden="true" style="display: none; max-height: 0; max-width: 0; overflow: hidden; opacity: 0; mso-hide: all;">
+      Lens 브랜드 로그인 화면에 입력할 일회용 인증 코드입니다.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="lens-bg" bgcolor="#f0f1f4" style="background-color: #f0f1f4;">
+      <tr>
+        <td align="center" style="padding: 32px 12px;">
+          <!--[if mso]><table role="presentation" width="480" cellpadding="0" cellspacing="0"><tr><td><![endif]-->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="lens-card" bgcolor="#ffffff" style="width: 100%; max-width: 480px; border: 1px solid #e9eaee; border-radius: 24px; background-color: #ffffff;">
+            <tr>
+              <td style="padding: 30px 24px 28px; font-family: Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', Arial, sans-serif;">
+                <p class="lens-title" style="margin: 0 0 24px; color: #17191e; font-size: 23px; line-height: 1.2; font-weight: 800; letter-spacing: -0.6px;">Lens</p>
+                <h1 class="lens-title" style="margin: 0 0 10px; color: #17191e; font-size: 26px; line-height: 1.35; font-weight: 750; letter-spacing: -0.6px;">브랜드 로그인 코드</h1>
+                <p class="lens-muted" style="margin: 0 0 24px; color: #58606b; font-size: 15px; line-height: 1.65; word-break: keep-all;">
+                  코드를 요청한 Lens 화면으로 돌아가 아래 6자리 숫자를 입력해 주세요.
+                </p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="lens-code" bgcolor="#eaf0ff" style="background-color: #eaf0ff; border-radius: 14px;">
+                  <tr>
+                    <td align="center" style="padding: 20px 8px 21px;">
+                      <p class="lens-code-text" style="margin: 0 0 5px; color: #2456cf; font-size: 13px; line-height: 1.5; font-weight: 700;">일회용 인증 코드</p>
+                      <p dir="ltr" class="lens-code-text" style="margin: 0; color: #2456cf; font-family: Menlo, Consolas, 'Courier New', monospace; font-size: 32px; line-height: 1.35; font-weight: 700; letter-spacing: 0.09em; white-space: nowrap;">{{ .Token }}</p>
+                    </td>
+                  </tr>
+                </table>
+                <p class="lens-muted" style="margin: 20px 0 0; color: #58606b; font-size: 14px; line-height: 1.7; word-break: keep-all;">
+                  코드가 만료됐다면 로그인 화면에서 새 코드를 요청해 주세요. 로그인 요청을 하지 않았다면 이 메일을 무시해 주세요.
+                </p>
+                <p class="lens-footer lens-muted" style="margin: 24px 0 0; padding-top: 16px; border-top: 1px solid #e9eaee; color: #58606b; font-size: 13px; line-height: 1.5;">Lens · 올인더밸류</p>
+              </td>
+            </tr>
+          </table>
+          <!--[if mso]></td></tr></table><![endif]-->
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

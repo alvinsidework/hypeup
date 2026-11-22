@@ -10,23 +10,26 @@ import {
 import { toast } from "sonner";
 import { LensConfirm } from "@/components/lens-confirm";
 import { Field, ghostBtn, inputClass, primaryBtn } from "@/components/lens-ui";
+import { ProposalFields } from "@/components/proposal-form";
+import type { BrandProposalTemplate } from "@/lib/hypeup/brand-types";
 import { relativeTime } from "@/lib/hypeup/format";
 import type { ThreadDesk } from "@/lib/hypeup/lens-repo";
 import {
+  EMPTY_PROPOSAL,
   FORMAT_LABEL,
-  FORMATS,
-  MODELS,
+  MODEL_LABEL,
   addDays,
   canPropose,
-  formatPercent,
+  formatDay,
   formatWon,
+  parseTerms,
   priceLabel,
+  proposalAddOnRows,
   rateToInput,
   statusLabel,
+  termsToInput,
   todaySeoul,
   usageLabel,
-  type DealFormat,
-  type DealModel,
   type LensDeal,
   type Party,
   type TermsInput,
@@ -56,11 +59,13 @@ export type LensAction = {
   conversions?: number | null;
 };
 
-const MODEL_LABEL: Record<DealModel, string> = {
-  fixed: "고정비",
-  performance: "성과",
-  hybrid: "혼합",
-};
+type SaveProposalTemplate = (
+  name: string,
+  terms: TermsInput,
+) => Promise<boolean>;
+
+const contractAttachmentCopy =
+  "양쪽이 조건에 합의하면 저장한 계약 정보와 서명이 계약서에 첨부됩니다.";
 
 export function LensChat({
   role,
@@ -68,12 +73,16 @@ export function LensChat({
   busy,
   onSend,
   onAction,
+  proposalTemplates,
+  onSaveProposalTemplate,
 }: {
   role: Party;
   desk: ThreadDesk;
   busy: boolean;
   onSend: (body: string) => Promise<boolean>;
   onAction: (action: LensAction) => Promise<void>;
+  proposalTemplates?: BrandProposalTemplate[];
+  onSaveProposalTemplate?: SaveProposalTemplate;
 }) {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -257,8 +266,11 @@ export function LensChat({
                   </summary>
                   <ProposeForm
                     rates={desk.rates}
+                    role={role}
                     busy={busy}
                     onAction={onAction}
+                    templates={proposalTemplates}
+                    onSaveTemplate={onSaveProposalTemplate}
                   />
                 </details>
               ) : null}
@@ -277,6 +289,7 @@ function TermsCard({
   termsTitle: string;
   dealLike: LensDeal["terms"];
 }) {
+  const addOns = proposalAddOnRows(dealLike.addOns);
   return (
     <div className="mt-2 rounded-lg bg-surface-2 px-3.5 py-3 text-left text-sm leading-relaxed text-muted">
       {termsTitle ? (
@@ -294,6 +307,26 @@ function TermsCard({
         수정 {dealLike.revisions}회 · {usageLabel(dealLike.usage_rights_days)} ·
         잔금 {dealLike.payment_terms.balance_due_days_after_post}일
       </p>
+      {addOns.length > 0 ? (
+        <div className="mt-2.5 border-t border-border pt-2.5">
+          <p className="mb-1 text-sm font-semibold text-fg">추가 옵션</p>
+          <dl className="space-y-1">
+            {addOns.map(({ id, label, details, amountKrw }) => (
+              <div
+                key={id}
+                className="flex flex-wrap justify-between gap-x-2 [overflow-wrap:anywhere]"
+              >
+                <dt className="min-w-0 text-fg">{label}</dt>
+                <dd className="min-w-0 tabular-nums">
+                  {[details, amountKrw == null ? "" : formatWon(amountKrw)]
+                    .filter(Boolean)
+                    .join(" · ") || "포함"}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -348,6 +381,7 @@ function DealCard({
         ) : null}
       </div>
       <TermsCard termsTitle="" dealLike={deal.terms} />
+      {deal.agreedAt ? <BrandContractCard deal={deal} /> : null}
       {deal.postUrl ? (
         <a
           className="mt-1 inline-flex min-h-11 items-center text-sm underline underline-offset-3 [overflow-wrap:anywhere]"
@@ -382,6 +416,11 @@ function DealCard({
       ) : null}
       {active && deal.status === "draft" && deal.proposedBy !== role ? (
         <div className="mt-3 flex flex-wrap gap-2">
+          {role === "brand" ? (
+            <p className="basis-full text-sm text-muted">
+              {contractAttachmentCopy}
+            </p>
+          ) : null}
           <button
             type="button"
             className={primaryBtn}
@@ -599,6 +638,74 @@ function DealCard({
   );
 }
 
+function BrandContractCard({ deal }: { deal: LensDeal }) {
+  const contract = deal.brandContract;
+  const personal = contract?.kind === "individual";
+  const details = contract
+    ? [
+        [personal ? "성명" : "법인명 또는 상호", contract.legalName],
+        [
+          personal ? "생년월일" : "사업자등록번호",
+          personal
+            ? formatDay(contract.birthDate)
+            : contract.registrationNumber,
+        ],
+        ["연락처", contract.phone],
+        ["주소", contract.address],
+      ].filter(([, value]) => value)
+    : [];
+
+  return (
+    <div className="mt-3">
+      {contract ? (
+        <details className="group/contract rounded-xl border border-border px-3">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            브랜드 계약 정보
+            <ChevronDown
+              className="size-4 text-muted transition-transform group-open/contract:rotate-180"
+              aria-hidden
+            />
+          </summary>
+          <div className="border-t border-border py-3">
+            <dl className="grid gap-2 text-sm [overflow-wrap:anywhere]">
+              {details.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="grid grid-cols-[minmax(4rem,auto)_1fr] gap-2"
+                >
+                  <dt className="text-muted">{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            {contract.signature ? (
+              <figure className="mt-3">
+                <figcaption className="mb-1.5 text-sm text-muted">
+                  첨부 서명
+                </figcaption>
+                <img
+                  src={contract.signature}
+                  loading="lazy"
+                  alt="브랜드 서명"
+                  className="max-h-28 max-w-full rounded-lg border border-border bg-white object-contain"
+                />
+              </figure>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
+      <Link
+        to="/brand/contract/$id"
+        params={{ id: deal.id }}
+        className={`${ghostBtn} mt-2`}
+      >
+        <FileText className="size-4" aria-hidden />
+        계약서 보기
+      </Link>
+    </div>
+  );
+}
+
 function ConfirmPaid({
   busy,
   onConfirm,
@@ -623,169 +730,170 @@ function ConfirmPaid({
 
 function ProposeForm({
   rates,
+  role,
   busy,
   onAction,
+  templates,
+  onSaveTemplate,
 }: {
   rates: ThreadDesk["rates"];
+  role: Party;
   busy: boolean;
   onAction: (action: LensAction) => Promise<void>;
+  templates?: BrandProposalTemplate[];
+  onSaveTemplate?: SaveProposalTemplate;
 }) {
-  const [terms, setTerms] = useState<TermsInput>({
-    title: "",
-    format: "reel",
-    model: "fixed",
-    amountKrw: 300000,
-    ratePercent: 15,
-    deliverableCount: 1,
-    description: "",
-    revisions: 1,
-    turnaroundDays: 7,
-    usageDays: 90,
-    balanceDays: 14,
-    notes: "",
-  });
-  const patch = (partial: Partial<TermsInput>) =>
-    setTerms((current) => ({ ...current, ...partial }));
-  const showAmount = terms.model !== "performance";
-  const showRate = terms.model !== "fixed";
+  const [terms, setTerms] = useState<TermsInput>(EMPTY_PROPOSAL);
+  const [templateName, setTemplateName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const savePending = useRef(false);
+  const saveDetailsRef = useRef<HTMLDetailsElement>(null);
+  const showPicker = rates.length > 0 || Boolean(templates?.length);
+
+  async function saveTemplate() {
+    const name = templateName.trim();
+    if (!name || !onSaveTemplate || busy || savePending.current) return;
+    const parsed = parseTerms(terms);
+    if (!parsed.ok) {
+      toast.error(parsed.error);
+      return;
+    }
+    savePending.current = true;
+    setSaving(true);
+    try {
+      if (await onSaveTemplate(name, termsToInput(parsed.terms))) {
+        setTemplateName("");
+        if (saveDetailsRef.current) saveDetailsRef.current.open = false;
+      }
+    } catch {
+      toast.error("제안서 템플릿을 저장하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      savePending.current = false;
+      setSaving(false);
+    }
+  }
 
   return (
-    <form
-      className="space-y-1 border-t border-border pt-2 pb-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void onAction({ action: "propose", terms });
-      }}
-    >
-      {rates.length ? (
-        <Field label="단가에서 불러오기">
-          <select
-            className={inputClass}
-            defaultValue=""
-            onChange={(event) => {
-              const rate = rates.find((item) => item.id === event.target.value);
-              if (rate) setTerms(rateToInput(rate));
+    <div className="space-y-3 border-t border-border pt-2 pb-5">
+      <form
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (busy || saving) return;
+          const parsed = parseTerms(terms);
+          if (!parsed.ok) {
+            toast.error(parsed.error);
+            return;
+          }
+          void onAction({
+            action: "propose",
+            terms: termsToInput(parsed.terms),
+          });
+        }}
+      >
+        {showPicker ? (
+          <Field label="협업 조건 불러오기">
+            <select
+              className={inputClass}
+              defaultValue=""
+              disabled={busy || saving}
+              onChange={(event) => {
+                const select = event.currentTarget;
+                const template = templates?.find(
+                  ({ id }) => `template:${id}` === select.value,
+                );
+                const rate = rates.find(
+                  ({ id }) => `rate:${id}` === select.value,
+                );
+                if (template) setTerms(template.terms);
+                if (rate) setTerms(rateToInput(rate));
+                select.value = "";
+              }}
+            >
+              <option value="">선택하기</option>
+              {templates?.length ? (
+                <optgroup label="저장한 제안서 템플릿">
+                  {templates.map(({ id, name }) => (
+                    <option key={id} value={`template:${id}`}>
+                      {name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {rates.length ? (
+                <optgroup label="등록된 단가">
+                  {rates.map(({ id, title }) => (
+                    <option key={id} value={`rate:${id}`}>
+                      {title}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+            </select>
+          </Field>
+        ) : null}
+        <ProposalFields
+          value={terms}
+          onChange={setTerms}
+          disabled={busy || saving}
+        />
+        {role === "brand" ? (
+          <p className="mt-3 text-sm text-muted">{contractAttachmentCopy}</p>
+        ) : null}
+        <button
+          className={`${primaryBtn} mt-3 w-full sm:w-auto`}
+          type="submit"
+          disabled={busy || saving}
+        >
+          조건 보내기
+        </button>
+      </form>
+      {onSaveTemplate ? (
+        <details
+          ref={saveDetailsRef}
+          className="group/template rounded-xl border border-border px-3"
+        >
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+            제안서 템플릿으로 저장
+            <ChevronDown
+              className="size-4 text-muted transition-transform group-open/template:rotate-180"
+              aria-hidden
+            />
+          </summary>
+          <form
+            className="border-t border-border pb-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveTemplate();
             }}
           >
-            <option value="">직접 입력</option>
-            {rates.map((rate) => (
-              <option key={rate.id} value={rate.id}>
-                {rate.title}
-              </option>
-            ))}
-          </select>
-        </Field>
+            <Field label="템플릿 이름">
+              <input
+                className={inputClass}
+                required
+                maxLength={60}
+                value={templateName}
+                disabled={busy || saving}
+                onChange={(event) => setTemplateName(event.target.value)}
+              />
+            </Field>
+            <button
+              className={`${ghostBtn} mt-3`}
+              type="submit"
+              disabled={busy || saving || !templateName.trim()}
+              aria-busy={saving}
+            >
+              {saving ? (
+                <LoaderCircle
+                  className="size-4 motion-safe:animate-spin"
+                  aria-hidden
+                />
+              ) : null}
+              템플릿 저장
+            </button>
+          </form>
+        </details>
       ) : null}
-      <Field label="제목">
-        <input
-          className={inputClass}
-          value={terms.title}
-          maxLength={80}
-          onChange={(event) => patch({ title: event.target.value })}
-        />
-      </Field>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Field label="형식">
-          <select
-            className={inputClass}
-            value={terms.format}
-            onChange={(event) =>
-              patch({ format: event.target.value as DealFormat })
-            }
-          >
-            {FORMATS.map((format) => (
-              <option key={format} value={format}>
-                {FORMAT_LABEL[format]}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="유형">
-          <select
-            className={inputClass}
-            value={terms.model}
-            onChange={(event) =>
-              patch({ model: event.target.value as DealModel })
-            }
-          >
-            {MODELS.map((model) => (
-              <option key={model} value={model}>
-                {MODEL_LABEL[model]}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {showAmount ? (
-          <Field label="금액 (원)">
-            <input
-              className={inputClass}
-              inputMode="numeric"
-              value={terms.amountKrw ?? ""}
-              onChange={(event) =>
-                patch({ amountKrw: Number(event.target.value) })
-              }
-            />
-          </Field>
-        ) : null}
-        {showRate ? (
-          <Field label="수수료 (%)">
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              value={terms.ratePercent ?? ""}
-              onChange={(event) =>
-                patch({ ratePercent: Number(event.target.value) })
-              }
-            />
-          </Field>
-        ) : null}
-        <Field label="수정 횟수">
-          <input
-            className={inputClass}
-            inputMode="numeric"
-            value={terms.revisions ?? 0}
-            onChange={(event) =>
-              patch({ revisions: Number(event.target.value) })
-            }
-          />
-        </Field>
-        <Field label="사용 기간 (일, 0이면 협의)">
-          <input
-            className={inputClass}
-            inputMode="numeric"
-            value={terms.usageDays ?? 0}
-            onChange={(event) =>
-              patch({ usageDays: Number(event.target.value) })
-            }
-          />
-        </Field>
-        <Field label="잔금 (게시 후 일)">
-          <input
-            className={inputClass}
-            inputMode="numeric"
-            value={terms.balanceDays ?? 14}
-            onChange={(event) =>
-              patch({ balanceDays: Number(event.target.value) })
-            }
-          />
-        </Field>
-      </div>
-      <p className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted tabular-nums">
-        {showAmount ? formatWon(terms.amountKrw || 0) : ""}
-        {showAmount && showRate ? " + " : ""}
-        {showRate
-          ? formatPercent(Math.round((terms.ratePercent || 0) * 100))
-          : ""}
-        {" · "}
-        {usageLabel(terms.usageDays || 0)}
-      </p>
-      <button
-        className={`${primaryBtn} mt-3 w-full sm:w-auto`}
-        type="submit"
-        disabled={busy}
-      >
-        조건 보내기
-      </button>
-    </form>
+    </div>
   );
 }

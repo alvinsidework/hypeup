@@ -1,13 +1,19 @@
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
 import { LensPublicProfile } from "@/components/lens-public-profile";
 import { LogoMark, Wordmark } from "@/components/logo";
+import { getBrandFavorite } from "@/lib/hypeup/brand-api";
 import { getLensPublic } from "@/lib/hypeup/lens-api";
 import { validateUsername } from "@/lib/hypeup/lens-rules";
 
 export const Route = createFileRoute("/$username")({
+  headers: () => ({ "Cache-Control": "private, no-store" }),
   loader: async ({ params }) => {
     if (!validateUsername(params.username).ok) throw notFound();
-    return getLensPublic({ data: { username: params.username } });
+    const data = await getLensPublic({ data: { username: params.username } });
+    const favorite = data.ready
+      ? await getBrandFavorite({ data: { username: data.page.username } })
+      : null;
+    return { ...data, favorite };
   },
   notFoundComponent: MissingPage,
   head: ({ loaderData }) => ({
@@ -54,7 +60,11 @@ function PublicProfile() {
         </Link>
       </header>
       <main className="lens-reveal mx-auto w-full max-w-[60rem] px-4 pt-8 pb-[calc(40px+env(safe-area-inset-bottom))] sm:px-8 sm:pt-12">
-        <LensPublicProfile key={data.page.username} page={data.page} />
+        <LensPublicProfile
+          key={data.page.username}
+          page={data.page}
+          favorite={data.favorite}
+        />
       </main>
     </div>
   );

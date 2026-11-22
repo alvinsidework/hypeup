@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { unpackBrandContract } from "./brand-repo.server";
 import { encryptToken, newId } from "./crypto.server";
 import { PORTFOLIO_METRICS, PORTFOLIO_METRIC_LABEL, type PortfolioMetric } from "./portfolio-metrics";
 import {
@@ -790,7 +791,9 @@ async function threadMeta(threadId: string): Promise<ThreadMeta | null> {
     ig_username: string;
   }>(
     `select t.id, t.user_id, t.brand_id, t.archived, coalesce(nullif(t.company_name, ''), b.company) as company, b.contact_name, b.email, b.trust,
-      p.display_name, p.username, u.name as ig_name, u.username as ig_username
+      case when p.is_public then p.display_name end as display_name,
+      case when p.is_public then p.username end as username,
+      u.name as ig_name, u.username as ig_username
      from hypeup_thread t
      join hypeup_brand b on b.id = t.brand_id
      join hypeup_user u on u.id = t.user_id
@@ -833,8 +836,11 @@ async function loadDeals(threadId: string): Promise<LensDeal[]> {
     post_note: string | null;
     agreed_at: unknown;
     cancel_requested_by: Party | null;
+    brand_contract_cipher: string | null;
+    contract_parties: LensDeal["contractParties"] | null;
   }>(
-    `select id, status, title, terms, proposed_by, post_url, posted_on, post_note, agreed_at, cancel_requested_by
+    `select id, status, title, terms, proposed_by, post_url, posted_on, post_note, agreed_at, cancel_requested_by,
+       case when agreed_at is not null then brand_contract_cipher end as brand_contract_cipher, contract_parties
      from hypeup_deal where thread_id = $1 order by created_at asc`,
     [threadId],
   );
@@ -884,6 +890,8 @@ async function loadDeals(threadId: string): Promise<LensDeal[]> {
         agreedAt: iso(deal.agreed_at) || null,
         cancelRequestedBy: deal.cancel_requested_by,
         settlements: rows,
+        ...(deal.brand_contract_cipher ? { brandContract: unpackBrandContract(deal.brand_contract_cipher) } : {}),
+        ...(deal.contract_parties ? { contractParties: deal.contract_parties } : {}),
       },
     ];
   });
@@ -955,18 +963,20 @@ export async function getInfluencerThread(userId: string, threadId: string): Pro
 
 export async function getBrandThread(username: string, brandId: string): Promise<ThreadDesk | null> {
   const sql = await getSql();
-  const rows = await sql.query<{ id: string; user_id: string }>(
-    `select t.id, t.user_id
+  const rows = await sql.query<{ id: string }>(
+    `select t.id
      from hypeup_thread t
      join hypeup_page p on p.user_id = t.user_id
      where p.username = $1 and p.is_public = true and t.brand_id = $2`,
     [username, brandId],
   );
-  const row = rows[0];
-  if (!row) return null;
-  const meta = await threadMeta(row.id);
-  if (!meta) return null;
-  const rates = (await listRates(row.user_id)).filter((rate) => rate.isPublic && !rate.priceHidden);
+  return rows[0] ? getBrandThreadById(brandId, rows[0].id) : null;
+}
+
+export async function getBrandThreadById(brandId: string, threadId: string): Promise<ThreadDesk | null> {
+  const meta = await threadMeta(threadId);
+  if (!meta || meta.brandId !== brandId) return null;
+  const rates = (await listRates(meta.userId)).filter((rate) => rate.isPublic && !rate.priceHidden);
   return deskFor(meta, rates);
 }
 
@@ -1031,74 +1041,31 @@ export async function sendText(input: {
 
 export async function openInquiry(input: {
   username: string;
-  email: string;
+  brandId: string;
   contactName: string;
   company: string;
-  instagramHandle: string | null;
-  bizNo: string | null;
-  trust: "personal_email" | "company_domain";
-}): Promise<Err | Ok<{ brandId: string; desk: ThreadDesk }>> {
+}): Promise<Err | Ok<{ desk: ThreadDesk }>> {
   const sql = await getSql();
-  const pages = await sql.query<{ user_id: string }>(
-    "select user_id from hypeup_page where username = $1 and is_public = true",
-    [input.username],
+  const [created] = await sql.query<{ thread_id: string }>(
+    `with creator as (
+       select user_id from hypeup_page where username = $1 and is_public
+     ), updated_brand as (
+       update hypeup_brand set contact_name = $3, company = $4
+       where id = $2 and exists (select 1 from creator)
+       returning id
+     ), new_thread as (
+       insert into hypeup_thread (id, user_id, brand_id, company_name, unread_count)
+       select $5, creator.user_id, updated_brand.id, $4, 1 from creator cross join updated_brand
+       on conflict (user_id, brand_id) do nothing returning id
+     )
+     insert into hypeup_message (id, thread_id, sender, body, kind)
+     select $6, id, 'system', $7, 'system' from new_thread returning thread_id`,
+    [input.username, input.brandId, input.contactName, input.company, newId(), newId(), systemSentences.opened(input.company)],
   );
-  const userId = pages[0]?.user_id;
-  if (!userId) return { ok: false, error: "페이지를 준비 중이에요." };
-  let brandId = "";
-  const found = await sql.query<{ id: string }>("select id from hypeup_brand where email = $1", [input.email]);
-  if (found[0]) {
-    brandId = found[0].id;
-  } else {
-    brandId = newId();
-    try {
-      await sql.query(
-        `insert into hypeup_brand (id, email, contact_name, company, instagram_handle, biz_no, trust)
-         values ($1,$2,$3,$4,$5,$6,$7)`,
-        [brandId, input.email, input.contactName, input.company, input.instagramHandle, input.bizNo, input.trust],
-      );
-    } catch (error) {
-      if (!isUnique(error)) throw error;
-      const again = await sql.query<{ id: string }>("select id from hypeup_brand where email = $1", [input.email]);
-      brandId = again[0]?.id ?? "";
-    }
-  }
-  if (!brandId) return { ok: false, error: "문의를 시작하지 못했습니다." };
-  let threadId = "";
-  let created = false;
-  const existing = await sql.query<{ id: string }>(
-    "select id from hypeup_thread where user_id = $1 and brand_id = $2",
-    [userId, brandId],
-  );
-  if (existing[0]) {
-    threadId = existing[0].id;
-  } else {
-    threadId = newId();
-    try {
-      await sql.query("insert into hypeup_thread (id, user_id, brand_id, company_name) values ($1,$2,$3,$4)", [
-        threadId,
-        userId,
-        brandId,
-        input.company,
-      ]);
-      created = true;
-    } catch (error) {
-      if (!isUnique(error)) throw error;
-      const again = await sql.query<{ id: string }>(
-        "select id from hypeup_thread where user_id = $1 and brand_id = $2",
-        [userId, brandId],
-      );
-      threadId = again[0]?.id ?? "";
-    }
-  }
-  if (!threadId) return { ok: false, error: "문의를 시작하지 못했습니다." };
-  if (created) {
-    const noted = await addMessage(threadId, "system", systemSentences.opened(input.company), "system", null);
-    if (!noted.ok) return noted;
-  }
-  const desk = await getBrandThread(input.username, brandId);
-  if (!desk) return { ok: false, error: "문의를 시작하지 못했습니다." };
-  return { ok: true, brandId, desk };
+  const desk = created
+    ? await getBrandThreadById(input.brandId, created.thread_id)
+    : await getBrandThread(input.username, input.brandId);
+  return desk ? { ok: true, desk } : { ok: false, error: "공개 페이지를 찾지 못했습니다." };
 }
 
 export async function applyDealAction(input: {
@@ -1133,9 +1100,11 @@ export async function applyDealAction(input: {
     const dealId = newId();
     const agreedColumn = input.actor.role === "influencer" ? "influencer_agreed_at" : "brand_agreed_at";
     await sql.query(
-      `insert into hypeup_deal (id, thread_id, user_id, status, title, terms, proposed_by, ${agreedColumn})
-       values ($1,$2,$3,'draft',$4,$5::jsonb,$6, now())`,
-      [dealId, meta.id, meta.userId, input.terms.title, JSON.stringify(input.terms), input.actor.role],
+      `insert into hypeup_deal (id, thread_id, user_id, status, title, terms, proposed_by, ${agreedColumn}, brand_contract_cipher)
+       values ($1,$2,$3,'draft',$4,$5::jsonb,$6, now(),
+         (select contract_cipher from hypeup_brand_account where brand_id = $7))`,
+      [dealId, meta.id, meta.userId, input.terms.title, JSON.stringify(input.terms), input.actor.role,
+        input.actor.role === "brand" ? meta.brandId : null],
     );
     const noted = await addMessage(meta.id, input.actor.role, systemSentences.proposed(actorName), "terms", {
       terms: input.terms,
@@ -1159,9 +1128,13 @@ export async function applyDealAction(input: {
   if (input.action === "agree") {
     const column = input.actor.role === "influencer" ? "influencer_agreed_at" : "brand_agreed_at";
     const rows = await sql.query(
-      `update hypeup_deal set ${column} = now(), status = 'agreed', agreed_at = now()
+      `update hypeup_deal set ${column} = now(), status = 'agreed', agreed_at = now(),
+       brand_contract_cipher = coalesce(brand_contract_cipher,
+         (select contract_cipher from hypeup_brand_account where brand_id = $2)),
+       contract_parties = $3::jsonb
        where id = $1 and status = 'draft' returning id`,
-      [deal.id],
+      [deal.id, input.actor.role === "brand" ? meta.brandId : null,
+        JSON.stringify({ creatorName: meta.influencerName, company: meta.company, contactName: meta.contactName })],
     );
     if (!rows.length) return { ok: false, error: "이 조건은 지금 확정할 수 없습니다." };
     const noted = await addMessage(meta.id, "system", systemSentences.agreed(), "system", { dealId: deal.id });
@@ -1280,7 +1253,7 @@ async function finish(meta: ThreadMeta, role: Party): Promise<Ok<{ desk: ThreadD
   return { ok: true, desk: await deskFor(meta, rates) };
 }
 
-export async function recordSource(userId: string, dealId: string): Promise<
+export async function recordSource(access: { userId?: string; brandId?: string }, dealId: string): Promise<
   | Err
   | Ok<{
       meta: ThreadMeta;
@@ -1290,13 +1263,16 @@ export async function recordSource(userId: string, dealId: string): Promise<
 > {
   const sql = await getSql();
   const rows = await sql.query<{ thread_id: string }>(
-    "select thread_id from hypeup_deal where id = $1 and user_id = $2",
-    [dealId, userId],
+    `select d.thread_id from hypeup_deal d join hypeup_thread t on t.id = d.thread_id
+     where d.id = $1 and (d.user_id = $2 or t.brand_id = $3)`,
+    [dealId, access.userId ?? null, access.brandId ?? null],
   );
   const threadId = rows[0]?.thread_id;
   if (!threadId) return { ok: false, error: "건을 찾지 못했습니다." };
   const meta = await threadMeta(threadId);
-  if (!meta || meta.userId !== userId) return { ok: false, error: "건을 찾지 못했습니다." };
+  if (!meta || (meta.userId !== access.userId && meta.brandId !== access.brandId)) {
+    return { ok: false, error: "건을 찾지 못했습니다." };
+  }
   const deal = (await loadDeals(threadId)).find((item) => item.id === dealId);
   if (!deal) return { ok: false, error: "건을 찾지 못했습니다." };
   return { ok: true, meta, deal, messages: await loadMessages(threadId) };

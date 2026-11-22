@@ -14,6 +14,7 @@ import {
 import type { ThreadDesk } from "@/lib/hypeup/lens-repo";
 
 export const Route = createFileRoute("/_app/inquiries/$id")({
+  headers: () => ({ "Cache-Control": "private, no-store" }),
   staticData: { workspaceBack: { to: "/inquiries", label: "브랜드 문의" } },
   loader: ({ params }) => getLensThread({ data: { id: params.id } }),
   component: ThreadPage,

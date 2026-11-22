@@ -1,3 +1,5 @@
+import type { BrandContractDetails } from "./brand-types";
+
 export const USERNAME_RE = /^[a-z0-9](?:[a-z0-9-]{1,22}[a-z0-9])$/;
 
 export const RESERVED_USERNAMES = new Set([
@@ -35,6 +37,11 @@ export const FORMATS = ["reel", "feed", "story", "tiktok", "youtube", "live"] as
 export type DealFormat = (typeof FORMATS)[number];
 export const MODELS = ["fixed", "performance", "hybrid"] as const;
 export type DealModel = (typeof MODELS)[number];
+export const MODEL_LABEL: Record<DealModel, string> = {
+  fixed: "고정비",
+  performance: "성과",
+  hybrid: "혼합",
+};
 export const CHANNELS = ["instagram", "tiktok", "youtube"] as const;
 export type WorkChannel = (typeof CHANNELS)[number];
 
@@ -83,6 +90,25 @@ export type DealStatus =
 
 export type Party = "influencer" | "brand";
 
+export const PRICED_ADD_ONS = {
+  collaboratorKrw: "공동작업자 등록",
+  youtubeRepostKrw: "YouTube 재업로드",
+  tiktokRepostKrw: "TikTok 재업로드",
+  cleanCopyKrw: "클린본 제공",
+} as const;
+
+export type PricedAddOn = keyof typeof PRICED_ADD_ONS;
+export type CustomAddOn = { label: string; details: string; amountKrw?: number | null };
+export type ProposalAddOns = Partial<Record<PricedAddOn, number>> & {
+  secondaryUse?: { months: number; amountKrw: number };
+  custom?: CustomAddOn[];
+};
+
+type ProposalAddOnsInput = Partial<Record<PricedAddOn, number | null>> & {
+  secondaryUse?: { months: number | null; amountKrw: number | null };
+  custom?: CustomAddOn[];
+};
+
 export type Terms = {
   version: 1;
   deal_type: DealModel;
@@ -107,6 +133,7 @@ export type Terms = {
     method_preference: "bank";
   };
   notes: string;
+  addOns?: ProposalAddOns;
 };
 
 export type TermsInput = {
@@ -127,6 +154,22 @@ export type TermsInput = {
   exclusivityCategory?: string | null;
   balanceDays?: number;
   notes?: string;
+  addOns?: ProposalAddOnsInput;
+};
+
+export const EMPTY_PROPOSAL: TermsInput = {
+  title: "",
+  format: "reel",
+  model: "fixed",
+  amountKrw: 300000,
+  ratePercent: 15,
+  deliverableCount: 1,
+  description: "",
+  revisions: 1,
+  turnaroundDays: 7,
+  usageDays: 90,
+  balanceDays: 14,
+  notes: "",
 };
 
 export type LensSettlement = {
@@ -153,6 +196,8 @@ export type LensDeal = {
   agreedAt: string | null;
   cancelRequestedBy: Party | null;
   settlements: LensSettlement[];
+  brandContract?: BrandContractDetails;
+  contractParties?: { creatorName: string; company: string; contactName: string };
 };
 
 export type LensMessage = {
@@ -261,6 +306,23 @@ export function formatPercent(bps: number): string {
   return `${pct.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}%`;
 }
 
+export function proposalAddOnRows(addOns: ProposalAddOns | undefined) {
+  if (!addOns) return [];
+  const rows: { id: string; label: string; details: string; amountKrw: number | null }[] = [];
+  for (const key of Object.keys(PRICED_ADD_ONS) as PricedAddOn[]) {
+    const amountKrw = addOns[key];
+    if (amountKrw != null) rows.push({ id: key, label: PRICED_ADD_ONS[key], details: "", amountKrw });
+  }
+  if (addOns.secondaryUse) {
+    const { months, amountKrw } = addOns.secondaryUse;
+    rows.push({ id: "secondaryUse", label: "2차 활용", details: `${months}개월`, amountKrw });
+  }
+  addOns.custom?.forEach(({ label, details, amountKrw }, index) => {
+    rows.push({ id: `custom-${index}`, label, details, amountKrw: amountKrw ?? null });
+  });
+  return rows;
+}
+
 export function formatDay(iso: string): string {
   const [year, month, day] = iso.split("-");
   if (!year || !month || !day) return iso;
@@ -308,14 +370,65 @@ export function isHttpUrl(value: string): boolean {
   }
 }
 
-function intIn(value: number | undefined, fallback: number, min: number, max: number): number | string {
+function intIn(value: unknown, fallback: number, min: number, max: number): number | string {
   const n = value ?? fallback;
-  if (!Number.isInteger(n) || n < min || n > max) return `값은 ${min}에서 ${max} 사이여야 합니다.`;
+  if (typeof n !== "number" || !Number.isInteger(n) || n < min || n > max) return `값은 ${min}에서 ${max} 사이여야 합니다.`;
   return n;
 }
 
-export function parseTerms(input: TermsInput): { ok: true; terms: Terms } | { ok: false; error: string } {
-  const title = input.title.trim();
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isMoney(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function parseAddOns(input: unknown): { addOns?: ProposalAddOns } | { error: string } {
+  if (input === undefined) return {};
+  if (!isObject(input)) return { error: "추가 옵션을 확인해 주세요." };
+
+  const addOns: ProposalAddOns = {};
+  for (const key of Object.keys(PRICED_ADD_ONS) as PricedAddOn[]) {
+    const price = input[key];
+    if (price === undefined) continue;
+    if (!isMoney(price)) return { error: `${PRICED_ADD_ONS[key]} 금액은 0원 이상의 정수입니다.` };
+    addOns[key] = price;
+  }
+
+  if (input.secondaryUse !== undefined) {
+    if (!isObject(input.secondaryUse)) return { error: "2차 활용 기간과 총액을 확인해 주세요." };
+    const { months, amountKrw } = input.secondaryUse;
+    if (typeof months !== "number" || !Number.isSafeInteger(months) || months < 1 || !isMoney(amountKrw)) {
+      return { error: "2차 활용은 1개월 이상의 기간과 0원 이상의 총액이 필요합니다." };
+    }
+    addOns.secondaryUse = { months, amountKrw };
+  }
+
+  if (input.custom !== undefined) {
+    if (!Array.isArray(input.custom)) return { error: "직접 추가한 옵션을 확인해 주세요." };
+    const custom: CustomAddOn[] = [];
+    for (const item of input.custom) {
+      if (!isObject(item) || typeof item.label !== "string") {
+        return { error: "직접 추가한 옵션의 이름을 입력해 주세요." };
+      }
+      const label = item.label.trim();
+      const details = item.details ?? "";
+      const amountKrw = item.amountKrw;
+      if (!label || label.length > 80) return { error: "추가 옵션 이름은 1~80자입니다." };
+      if (typeof details !== "string" || details.length > 280) return { error: "추가 옵션 설명은 280자까지입니다." };
+      if (amountKrw != null && !isMoney(amountKrw)) return { error: "추가 옵션 금액은 0원 이상의 정수입니다." };
+      custom.push({ label, details: details.trim(), ...(amountKrw != null ? { amountKrw } : {}) });
+    }
+    if (custom.length) addOns.custom = custom;
+  }
+
+  return Object.keys(addOns).length ? { addOns } : {};
+}
+
+export function parseTerms(input: unknown): { ok: true; terms: Terms } | { ok: false; error: string } {
+  if (!isObject(input)) return { ok: false, error: "제안 조건을 확인해 주세요." };
+  const title = typeof input.title === "string" ? input.title.trim() : "";
   if (title.length < 1 || title.length > 80) return { ok: false, error: "제목은 1~80자입니다." };
   if (!FORMATS.includes(input.format as DealFormat)) return { ok: false, error: "형식을 선택해 주세요." };
   if (!MODELS.includes(input.model as DealModel)) return { ok: false, error: "유형을 선택해 주세요." };
@@ -327,12 +440,12 @@ export function parseTerms(input: TermsInput): { ok: true; terms: Terms } | { ok
   let bps: number | null = null;
   if (needsAmount) {
     const won = input.amountKrw ?? 0;
-    if (!Number.isInteger(won) || won < 1) return { ok: false, error: "금액은 1원 이상의 정수입니다." };
+    if (!isMoney(won) || won < 1) return { ok: false, error: "금액은 1원 이상의 정수입니다." };
     amount = won;
   }
   if (needsRate) {
     const percent = input.ratePercent ?? 0;
-    if (!Number.isFinite(percent) || percent < 0.01 || percent > 100) {
+    if (typeof percent !== "number" || !Number.isFinite(percent) || percent < 0.01 || percent > 100) {
       return { ok: false, error: "수수료는 0.01%에서 100% 사이입니다." };
     }
     bps = Math.round(percent * 100);
@@ -340,7 +453,9 @@ export function parseTerms(input: TermsInput): { ok: true; terms: Terms } | { ok
   }
   const count = intIn(input.deliverableCount, 1, 1, 20);
   if (typeof count === "string") return { ok: false, error: "산출물 수는 1~20입니다." };
-  const description = (input.description ?? "").trim();
+  const descriptionInput = input.description ?? "";
+  if (typeof descriptionInput !== "string") return { ok: false, error: "산출물 설명을 확인해 주세요." };
+  const description = descriptionInput.trim();
   if (description.length > 280) return { ok: false, error: "설명은 280자까지입니다." };
   const revisions = intIn(input.revisions, 0, 0, 5);
   if (typeof revisions === "string") return { ok: false, error: "수정 횟수는 0~5입니다." };
@@ -350,12 +465,21 @@ export function parseTerms(input: TermsInput): { ok: true; terms: Terms } | { ok
   if (typeof usage === "string") return { ok: false, error: "사용 기간을 확인해 주세요." };
   const balance = intIn(input.balanceDays, 14, 0, 365);
   if (typeof balance === "string") return { ok: false, error: "잔금 기한은 0~365일입니다." };
-  const notes = (input.notes ?? "").trim();
+  const notesInput = input.notes ?? "";
+  if (typeof notesInput !== "string") return { ok: false, error: "메모를 확인해 주세요." };
+  const notes = notesInput.trim();
   if (notes.length > 500) return { ok: false, error: "메모는 500자까지입니다." };
+  if ([input.paidAds, input.rawFiles, input.exclusivityEnabled].some((flag) => flag != null && typeof flag !== "boolean")) {
+    return { ok: false, error: "사용권 및 독점 조건을 확인해 주세요." };
+  }
   const exclusivityDays = input.exclusivityEnabled ? intIn(input.exclusivityDays, 30, 1, 365) : 0;
   if (typeof exclusivityDays === "string") return { ok: false, error: "독점 기간은 1~365일입니다." };
-  const category = (input.exclusivityCategory ?? "").trim();
+  const categoryInput = input.exclusivityCategory ?? "";
+  if (typeof categoryInput !== "string") return { ok: false, error: "독점 범주를 확인해 주세요." };
+  const category = categoryInput.trim();
   if (category.length > 40) return { ok: false, error: "독점 범주는 40자까지입니다." };
+  const addOns = parseAddOns(input.addOns);
+  if ("error" in addOns) return { ok: false, error: addOns.error };
   return {
     ok: true,
     terms: {
@@ -386,6 +510,7 @@ export function parseTerms(input: TermsInput): { ok: true; terms: Terms } | { ok
         method_preference: "bank",
       },
       notes,
+      ...addOns,
     },
   };
 }
@@ -409,6 +534,7 @@ export function termsToInput(terms: Terms): TermsInput {
     exclusivityCategory: terms.exclusivity.category,
     balanceDays: terms.payment_terms.balance_due_days_after_post,
     notes: terms.notes,
+    ...(terms.addOns ? { addOns: terms.addOns } : {}),
   };
 }
 
@@ -561,6 +687,7 @@ export type LensRecordBody = {
     postedOn: string | null;
     postNote: string | null;
     settlements: LensSettlement[];
+    brandContract?: BrandContractDetails;
   };
   messages: { sender: string; body: string; createdAt: string }[];
   platformNote: string;
@@ -596,6 +723,9 @@ export function buildDealRecord(input: {
       postedOn: input.deal.postedOn,
       postNote: input.deal.postNote,
       settlements: input.deal.settlements,
+      ...(input.deal.agreedAt && input.deal.brandContract
+        ? { brandContract: input.deal.brandContract }
+        : {}),
     },
     messages: input.messages,
     platformNote: "지급 표시는 브랜드의 선언이며 Lens가 입금을 확인한 것은 아닙니다.",

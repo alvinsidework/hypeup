@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
-import { SignJWT, jwtVerify } from "jose";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { AuthRequiredError, requireUser, syncPortfolioMedia } from "./actions.server";
+import { getBrandIdentity } from "./brand-auth.server";
+import { getBrandAccount, listBrandTemplates } from "./brand-repo.server";
 import { copy } from "./copy";
-import { isSecureCookie } from "./env.server";
+import { encryptToken } from "./crypto.server";
 import {
   applyDealAction,
   archiveThread,
@@ -43,7 +44,6 @@ import {
   maskEmail,
   parseTerms,
   suggestUsername,
-  trustForEmail,
   trustLabel,
   validateUsername,
   type TermsInput,
@@ -52,10 +52,8 @@ import { PORTFOLIO_METRICS } from "./portfolio-metrics";
 import { PROFILE_PHOTO_BASE64_LENGTH } from "./profile-photo";
 import { isProfileJpeg } from "./profile-photo.server";
 import { getMedia, listMedia, type UserRecord } from "./repo";
-import { sessionSecretKey } from "./session.server";
 import { koreanError } from "@/lib/instagram/errors";
 
-const BRAND_COOKIE = "lens_brand";
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -68,31 +66,10 @@ async function signedIn() {
   }
 }
 
-async function brandIdFromCookie(): Promise<string | null> {
-  const token = getCookie(BRAND_COOKIE);
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, sessionSecretKey());
-    return typeof payload.brandId === "string" ? payload.brandId : null;
-  } catch {
-    return null;
-  }
-}
-
-async function rememberBrand(brandId: string): Promise<void> {
-  const token = await new SignJWT({ brandId })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("30d")
-    .sign(sessionSecretKey());
-  const request = getRequest();
-  setCookie(BRAND_COOKIE, token, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: request ? isSecureCookie(request) : false,
-    maxAge: 60 * 60 * 24 * 30,
-  });
+async function signedInBrand() {
+  setResponseHeader("Cache-Control", "private, no-store");
+  const identity = await getBrandIdentity();
+  return identity ? getBrandAccount(identity) : null;
 }
 
 function cleanHandle(value: string): string {
@@ -458,9 +435,16 @@ export const getLensInquiry = createServerFn({ method: "POST" })
     if (!parsed.ok) return { ready: false as const, desk: null };
     const page = await getPublicPage(parsed.username);
     if (!page) return { ready: false as const, desk: null };
-    const brandId = await brandIdFromCookie();
-    const desk = brandId ? await getBrandThread(parsed.username, brandId) : null;
-    return { ready: true as const, name: page.displayName, username: page.username, desk };
+    const brand = await signedInBrand();
+    const desk = brand ? await getBrandThread(parsed.username, brand.id) : null;
+    return {
+      ready: true as const,
+      name: page.displayName,
+      username: page.username,
+      desk,
+      account: brand ? { contactName: brand.contactName, company: brand.company, email: brand.email } : null,
+      templates: brand && desk ? await listBrandTemplates(brand.id) : [],
+    };
   });
 
 export const openLensInquiry = createServerFn({ method: "POST" })
@@ -469,46 +453,18 @@ export const openLensInquiry = createServerFn({ method: "POST" })
       username: z.string().max(24),
       contactName: z.string().max(40),
       company: z.string().max(60),
-      email: z.string().max(120),
-      instagramHandle: z.string().max(40).optional(),
-      bizNo: z.string().max(12).optional(),
     }),
   )
   .handler(async ({ data }) => {
+    const brand = await signedInBrand();
+    if (!brand) return { ok: false as const, error: "브랜드 로그인이 필요합니다." };
     const parsedName = validateUsername(data.username);
     if (!parsedName.ok) return { ok: false as const, error: "페이지를 준비 중이에요." };
     const contactName = data.contactName.trim();
     const company = data.company.trim();
-    const email = data.email.trim().toLowerCase();
     if (contactName.length < 1 || contactName.length > 40) return { ok: false as const, error: "담당자 이름은 1~40자입니다." };
     if (company.length < 1 || company.length > 60) return { ok: false as const, error: "브랜드명은 1~60자입니다." };
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false as const, error: "메일 형식을 확인해 주세요." };
-    const biz = (data.bizNo ?? "").replace(/\D/g, "");
-    if (biz && biz.length !== 10) return { ok: false as const, error: "사업자등록번호는 숫자 10자리입니다." };
-    let opened;
-    try {
-      opened = await openInquiry({
-        username: parsedName.username,
-        email,
-        contactName,
-        company,
-        instagramHandle: cleanHandle(data.instagramHandle ?? "") || null,
-        bizNo: biz || null,
-        trust: trustForEmail(email),
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message === "AUTH_SECRET is not set") {
-        return { ok: false as const, error: "문의 세션을 만들 서버 키가 없습니다." };
-      }
-      throw error;
-    }
-    if (!opened.ok) return opened;
-    try {
-      await rememberBrand(opened.brandId);
-    } catch {
-      return { ok: false as const, error: "문의 세션을 만들 서버 키가 없습니다." };
-    }
-    return { ok: true as const, desk: opened.desk };
+    return openInquiry({ username: parsedName.username, brandId: brand.id, contactName, company });
   });
 
 export const sendLensMessage = createServerFn({ method: "POST" })
@@ -527,9 +483,9 @@ export const sendLensMessage = createServerFn({ method: "POST" })
       if (!user) return { ok: false as const, error: "로그인이 필요합니다." };
       return sendText({ threadId: data.threadId, userId: user.id, body });
     }
-    const brandId = await brandIdFromCookie();
-    if (!brandId) return { ok: false as const, error: "문의 정보가 만료되었습니다. 다시 입력해 주세요." };
-    return sendText({ threadId: data.threadId, brandId, body });
+    const brand = await signedInBrand();
+    if (!brand) return { ok: false as const, error: "브랜드 로그인이 필요합니다." };
+    return sendText({ threadId: data.threadId, brandId: brand.id, body });
   });
 
 export const actOnLensDeal = createServerFn({ method: "POST" })
@@ -552,9 +508,9 @@ export const actOnLensDeal = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const actor = data.role === "influencer" ? await signedIn() : null;
-    const brandId = data.role === "brand" ? await brandIdFromCookie() : null;
+    const brand = data.role === "brand" ? await signedInBrand() : null;
     if (data.role === "influencer" && !actor) return { ok: false as const, error: "로그인이 필요합니다." };
-    if (data.role === "brand" && !brandId) return { ok: false as const, error: "문의 정보가 만료되었습니다. 다시 입력해 주세요." };
+    if (data.role === "brand" && !brand) return { ok: false as const, error: "브랜드 로그인이 필요합니다." };
     let terms;
     if (data.action === "propose") {
       const parsed = parseTerms((data.terms ?? {}) as TermsInput);
@@ -577,7 +533,7 @@ export const actOnLensDeal = createServerFn({ method: "POST" })
         role: data.role,
         name: "",
         userId: actor?.id,
-        brandId: brandId ?? undefined,
+        brandId: brand?.id,
       },
       action: data.action,
       dealId: data.dealId,
@@ -598,13 +554,13 @@ export const exportLensRecord = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await signedIn();
     if (!user) return { ok: false as const, error: "로그인이 필요합니다." };
-    const source = await recordSource(user.id, data.dealId);
+    const source = await recordSource({ userId: user.id }, data.dealId);
     if (!source.ok) return source;
     const body = buildDealRecord({
-      influencerName: source.meta.influencerName,
+      influencerName: source.deal.contractParties?.creatorName ?? source.meta.influencerName,
       username: source.meta.username,
-      company: source.meta.company,
-      contactName: source.meta.contactName,
+      company: source.deal.contractParties?.company ?? source.meta.company,
+      contactName: source.deal.contractParties?.contactName ?? source.meta.contactName,
       emailMasked: maskEmail(source.meta.email),
       trustLabel: trustLabel(source.meta.trust),
       deal: source.deal,
@@ -615,6 +571,28 @@ export const exportLensRecord = createServerFn({ method: "POST" })
       })),
     });
     const hash = createHash("sha256").update(canonicalJson(body)).digest("hex");
-    if (data.save) await saveRecord(data.dealId, hash, body);
+    if (data.save) {
+      const saved = source.deal.brandContract
+        ? { kind: "lens-record", version: 1, encryptedBody: encryptToken(canonicalJson(body)) }
+        : body;
+      await saveRecord(data.dealId, hash, saved);
+    }
     return { ok: true as const, body, hash };
+  });
+
+export const getLensContract = createServerFn({ method: "GET" })
+  .validator(z.object({ dealId: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    const [creator, brand] = await Promise.all([signedIn(), signedInBrand()]);
+    if (!creator && !brand) return null;
+    const source = await recordSource({ userId: creator?.id, brandId: brand?.id }, data.dealId);
+    if (!source.ok || !source.deal.agreedAt) return null;
+    return {
+      role: creator?.id === source.meta.userId ? ("influencer" as const) : ("brand" as const),
+      threadId: source.meta.id,
+      creatorName: source.deal.contractParties?.creatorName ?? source.meta.influencerName,
+      company: source.deal.contractParties?.company ?? source.meta.company,
+      contactName: source.deal.contractParties?.contactName ?? source.meta.contactName,
+      deal: source.deal,
+    };
   });

@@ -11,7 +11,7 @@
 - `https://hypeup.vercel.app` 는 다른 Next.js 사이트다. 이 앱이 아니다.
 - 로컬 미리보기는 포트 8080, `npm run dev`
 - 회사 표기: 올인더밸류
-- 랜딩 문구는 유지한다. “인스타그램 댓글과 DM, 손쉽게 자동화하기” / 연결 제목 “내 인스타그램으로 대시보드 연결”
+- 랜딩 제목 “인스타그램 댓글과 DM, 광고 관리까지 자동화하기” / 연결 제목 “내 인스타그램으로 대시보드 연결”
 - 내부 폴더 `src/lib/hypeup`, DB 테이블 `hypeup_*`, 타입 `HypeupUser` 는 이름을 바꾸지 않는다.
 - `/Volumes/PortableSSD/Dev/lens` 는 Capacitor 안드로이드 셸이다. 이 깃 저장소가 아니다. `appId` 는 `dev.lens.app`, `server.url` 은 위 라이브 주소. 셸 저장소는 사용자가 시키기 전에는 커밋하지 않는다.
 - 워크스페이스 `Agents.md` 의 `/workspace` 샌드박스 절차는 이 맥 작업에 적용하지 않는다.
@@ -30,7 +30,18 @@
 
 프로덕션은 Supabase 프로젝트 `pddyogjfpizrfxkmpmdw` (도쿄)다. 앱은 IPv4 풀러 `aws-1-ap-northeast-1.pooler.supabase.com:6543` 를 쓴다. 직접 호스트 `db.pddyogjfpizrfxkmpmdw.supabase.co` 는 이 환경에서 쓰지 않는다. 접속 문자열은 `.env.local` 의 `DATABASE_URL` 에만 있다.
 
-마이그레이션은 `migrations/*.sql` 이고 `scripts/migrate.mjs` 가 배포 빌드에서 한 번씩 적용한다. `migrations/auth/` 는 자동 적용되지 않는다. 인증은 기본 꺼짐이다. 인스타그램 세션이 사용자 식별이다. 이메일 OTP로 바꾸지 않는다.
+마이그레이션은 `migrations/*.sql` 이고 `scripts/migrate.mjs` 가 배포 빌드에서 한 번씩 적용한다. `migrations/auth/` 는 자동 적용되지 않는다. 크리에이터는 Instagram 세션을 쓴다. 브랜드는 별도 Supabase Auth 세션으로 식별한다.
+
+## 브랜드 대시보드
+
+- 기존 문의는 같은 이메일이 인증되면 해당 브랜드에 연결된다. 계약 정보와 서명의 복사본은 브랜드가 제안하거나 수락한 시점에 저장하고, 합의 후 두 당사자에게 표시한다. 계약 정보 수정은 이후 건에만 적용된다.
+
+### 브랜드 이메일 인증 코드
+
+1. Supabase **Authentication → Sign In / Providers** 에서 **Email**, **Confirm Email**, **Allow new users to sign up** 을 켠다. Lens는 최초 코드 요청에서 `shouldCreateUser: true` 로 가입을 허용한다. Email 공급자의 **Email OTP length** 를 Lens 입력 규격인 `6` 으로 설정한다. 코드 유효 시간은 **Email OTP expiration** 에서 관리한다. [Supabase 인증 설정](https://supabase.com/docs/guides/auth/general-configuration) · [OTP 설정](https://supabase.com/docs/guides/auth/auth-email-passwordless#with-otp)
+2. Supabase **Email Templates** 에서 **Magic Link** 와 **Confirm signup** 두 항목에 같은 내용을 저장한다. 제목은 `[Lens] 브랜드 로그인 코드` 로 넣고 본문에는 HTML 원본 전체를 붙여 넣는다. 기존 인증 계정은 Magic Link 템플릿, 최초 가입과 미인증 계정은 Confirm signup 템플릿으로 발송된다. 두 본문에서 `{{ .Token }}` 을 사용하고 `{{ .ConfirmationURL }}` 과 `{{ .TokenHash }}` 는 제거한다. [인증 코드 HTML 원본](./supabase-brand-otp-email.html) · [템플릿 설정](https://supabase.com/dashboard/project/_/auth/templates) · [최초 가입 발송 분기](https://github.com/supabase/auth/blob/master/internal/api/magic_link.go#L71-L158)
+3. 일반 브랜드 주소에 발송하려면 커스텀 SMTP를 설정한다. Supabase 기본 발송은 프로젝트 팀 주소에 한정된다. Lens 운영 환경에서 `SUPABASE_URL` 과 `SUPABASE_ANON_KEY` 를 사용한다. `BRAND_AUTH_EMAIL_ENABLED=false` 를 설정하면 브랜드 로그인을 끌 수 있다. [SMTP 설정](https://supabase.com/dashboard/project/_/auth/smtp) · [SMTP 안내](https://supabase.com/docs/guides/auth/auth-smtp)
+4. 최초 가입 주소와 기존 인증 주소 각각으로 코드를 받아 Lens에서 요청한 화면에 입력해 가입과 로그인을 확인한다. 이메일 코드 로그인은 Lens에서 `verifyOtp` 로 완료된다. [코드 확인 흐름](https://supabase.com/docs/guides/auth/auth-email-passwordless#signing-in-with-email-otp)
 
 ## Meta 앱
 

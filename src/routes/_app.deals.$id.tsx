@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowUpRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -8,12 +8,13 @@ import { exportLensRecord } from "@/lib/hypeup/lens-api";
 import {
   FORMAT_LABEL,
   formatWon,
+  proposalAddOnRows,
   statusLabel,
   usageLabel,
-  type DealStatus,
 } from "@/lib/hypeup/lens-rules";
 
 export const Route = createFileRoute("/_app/deals/$id")({
+  headers: () => ({ "Cache-Control": "private, no-store" }),
   staticData: { workspaceBack: { to: "/inquiries", label: "브랜드 문의" } },
   loader: async ({ params }) => {
     const record = await exportLensRecord({
@@ -31,48 +32,8 @@ function DealRecordPage() {
   if (!record.ok) {
     return <p className="text-[14px]">{record.error}</p>;
   }
-  const deal = record.body.deal as {
-    title: string;
-    status: DealStatus;
-    terms: {
-      title: string;
-      format: "reel";
-      deal_type: string;
-      pricing: {
-        fixed_amount_krw: number | null;
-        performance_rate_bps: number | null;
-      };
-      revisions: number;
-      usage_rights_days: number;
-      deliverables: { description: string };
-      notes: string;
-    };
-    postUrl: string | null;
-    postedOn: string | null;
-    postNote: string | null;
-    agreedAt: string | null;
-    settlements: {
-      amountKrw: number;
-      status: string;
-      note: string | null;
-      dueOn: string | null;
-    }[];
-  };
-  const influencer = record.body.influencer as {
-    name: string;
-    username: string;
-  };
-  const brand = record.body.brand as {
-    company: string;
-    contactName: string;
-    emailMasked: string;
-    trustLabel: string;
-  };
-  const messages = record.body.messages as {
-    sender: string;
-    body: string;
-    createdAt: string;
-  }[];
+  const { deal, influencer, brand, messages } = record.body;
+  const addOns = proposalAddOnRows(deal.terms.addOns);
 
   return (
     <div className="max-w-3xl">
@@ -109,6 +70,15 @@ function DealRecordPage() {
             </button>
           }
         />
+        {deal.agreedAt ? (
+          <Link
+            to="/brand/contract/$id"
+            params={{ id: data.id }}
+            className="lens-button lens-button-secondary mb-4"
+          >
+            계약서 보기
+          </Link>
+        ) : null}
       </div>
       <article
         id="lens-record"
@@ -152,6 +122,20 @@ function DealRecordPage() {
             <p>{deal.terms.deliverables.description}</p>
           ) : null}
           {deal.terms.notes ? <p>{deal.terms.notes}</p> : null}
+          {addOns.length ? (
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 py-2">
+              {addOns.map(({ id, label, details, amountKrw }) => (
+                <div className="contents" key={id}>
+                  <dt>{label}</dt>
+                  <dd>
+                    {[details, amountKrw == null ? "" : formatWon(amountKrw)]
+                      .filter(Boolean)
+                      .join(" · ") || "금액 협의"}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
           {deal.agreedAt ? (
             <p className="text-muted">확정 {deal.agreedAt}</p>
           ) : null}

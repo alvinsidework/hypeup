@@ -16,12 +16,8 @@ export function Landing({ demoMode }: { demoMode: boolean }) {
     <PublicLayout
       demoMode={demoMode}
       headerAction={
-        <Link
-          to="/connect"
-          search={{ error: undefined, detail: undefined }}
-          className="lens-button lens-button-quiet"
-        >
-          연결 안내 <ArrowRight className="size-4" aria-hidden />
+        <Link to="/brand" search={{}} className="lens-button lens-button-quiet">
+          브랜드이신가요? <ArrowRight className="size-4 shrink-0" aria-hidden />
         </Link>
       }
     >
@@ -29,7 +25,7 @@ export function Landing({ demoMode }: { demoMode: boolean }) {
         <section className="min-w-0" aria-labelledby="landing-heading">
           <p className="mb-4 flex items-center gap-2 text-sm font-medium text-muted sm:mb-5">
             <Instagram className="size-[18px]" strokeWidth={1.75} aria-hidden />
-            Instagram 운영 도구
+            크리에이터 어시스턴트
           </p>
           <h1
             id="landing-heading"

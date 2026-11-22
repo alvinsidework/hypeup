@@ -1,8 +1,19 @@
 import * as Avatar from "@radix-ui/react-avatar";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Clapperboard, Copy, Mail, X } from "lucide-react";
+import { Link, useRouter } from "@tanstack/react-router";
+import {
+  ArrowUpRight,
+  Bookmark,
+  Clapperboard,
+  Copy,
+  LoaderCircle,
+  Mail,
+  X,
+} from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { MediaPreview } from "@/components/media-preview";
+import { setBrandFavorite } from "@/lib/hypeup/brand-api";
 import { formatCount, initial } from "@/lib/hypeup/format";
 import type { PublicPage } from "@/lib/hypeup/lens-repo";
 
@@ -12,9 +23,11 @@ type PublicStat = PublicWork["stats"][number];
 export function LensPublicProfile({
   page,
   preview = false,
+  favorite,
 }: {
   page: PublicPage;
   preview?: boolean;
+  favorite?: { saved: boolean } | null;
 }) {
   return (
     <article className="mx-auto w-full max-w-4xl">
@@ -113,6 +126,9 @@ export function LensPublicProfile({
               브랜드 문의하기
             </Link>
           )}
+          {favorite && !preview ? (
+            <FavoriteButton username={page.username} saved={favorite.saved} />
+          ) : null}
           {page.links.map((link, index) => (
             <a
               key={`${link.url}-${index}`}
@@ -178,6 +194,59 @@ export function LensPublicProfile({
         </section>
       ) : null}
     </article>
+  );
+}
+
+function FavoriteButton({
+  username,
+  saved,
+}: {
+  username: string;
+  saved: boolean;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function changeFavorite() {
+    setBusy(true);
+    try {
+      const result = await setBrandFavorite({
+        data: { username, saved: !saved },
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      await router.invalidate();
+      toast.success(
+        saved ? "관심 목록에서 삭제했습니다." : "관심 목록에 추가했습니다.",
+      );
+    } catch {
+      toast.error("관심 목록을 변경하지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      aria-pressed={saved}
+      aria-busy={busy}
+      disabled={busy}
+      onClick={() => void changeFavorite()}
+      className="lens-button lens-button-secondary"
+    >
+      {busy ? (
+        <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden />
+      ) : (
+        <Bookmark
+          className={saved ? "size-4 fill-current" : "size-4"}
+          aria-hidden
+        />
+      )}
+      {saved ? "관심 목록에 저장됨" : "관심 목록에 추가"}
+    </button>
   );
 }
 

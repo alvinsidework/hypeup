@@ -8,6 +8,7 @@ import {
 } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Download, EllipsisVertical, Share, X } from "lucide-react";
+import { mobilePlatform } from "@/lib/hypeup/mobile-platform";
 import { isLensApp } from "@/lib/hypeup/native-auth";
 
 type InstallPlatform = "ios" | "android";
@@ -24,17 +25,6 @@ type InstallContext = {
 };
 
 const PwaInstallContext = createContext<InstallContext | null>(null);
-
-function mobilePlatform(): InstallPlatform | null {
-  const { userAgent, platform, maxTouchPoints } = navigator;
-  if (
-    /iPhone|iPad|iPod/i.test(userAgent) ||
-    (platform === "MacIntel" && maxTouchPoints > 1)
-  )
-    return "ios";
-  if (/Android/i.test(userAgent)) return "android";
-  return null;
-}
 
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [platform, setPlatform] = useState<InstallPlatform | null>(null);

@@ -1,6 +1,6 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { Plugin } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
@@ -11,6 +11,30 @@ import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
+
+const pwaAssets = new Map([
+  ["/__grok/manifest.webmanifest", "/lens.webmanifest"],
+  ["/__grok/icon-180.png", "/lens-icon-180.png"],
+]);
+
+function lensPwaAssetsPlugin(): Plugin {
+  function configure({ middlewares }: Pick<ViteDevServer, "middlewares">) {
+    middlewares.use((req, res, next) => {
+      const asset = pwaAssets.get(req.url?.split("?", 1)[0] ?? "");
+      if (!asset || (req.method !== "GET" && req.method !== "HEAD")) {
+        return next();
+      }
+      res.writeHead(307, { Location: asset, "Cache-Control": "no-cache" });
+      res.end();
+    });
+  }
+
+  return {
+    name: "lens:pwa-assets",
+    configureServer: configure,
+    configurePreviewServer: configure,
+  };
+}
 
 /** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
 function hasGlobbedMigrations(root: string): boolean {
@@ -165,6 +189,8 @@ export default defineConfig(({ command, isPreview }) => ({
     authPopupPlugin(),
     // Dev-only /__app-env, read by scripts/check-auth-invariant.mjs.
     appEnvPlugin(),
+    // Keep the platform's install links while serving Lens assets.
+    lensPwaAssetsPlugin(),
     // PWA head + ?install=1 tutorial page; runs before Start/Nitro.
     grokPwaPlugin(),
     tailwindcss(),
@@ -173,6 +199,9 @@ export default defineConfig(({ command, isPreview }) => ({
       ? [
           nitro({
             preset: "vercel",
+            routeRules: Object.fromEntries(
+              Array.from(pwaAssets, ([path, to]) => [path, { redirect: { to, status: 307 } }]),
+            ),
             // Auto-registers server/middleware/* (the PWA install page +
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.

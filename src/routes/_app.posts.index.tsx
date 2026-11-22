@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { MediaGrid } from "@/components/media-grid";
 import { PageHeader } from "@/components/page-header";
-import { RefreshOverlay } from "@/components/refresh-overlay";
+import { RefreshButton } from "@/components/refresh-button";
 import { copy } from "@/lib/hypeup/copy";
 import { getPosts, refreshPosts } from "@/lib/hypeup/api";
 
@@ -17,13 +17,16 @@ export const Route = createFileRoute("/_app/posts/")({
 
 function PostsPending() {
   return (
-    <div>
-      <PageHeader title="게시물" description="불러오는 중" />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div aria-busy="true">
+      <PageHeader title="게시물" />
+      <div
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
+        aria-hidden
+      >
         {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="overflow-hidden rounded-lg border border-border bg-surface">
+          <div key={index} className="lens-panel overflow-hidden">
             <div className="aspect-square animate-pulse bg-surface-2" />
-            <div className="h-10 animate-pulse bg-surface" />
+            <div className="m-3 h-4 w-3/4 animate-pulse rounded-full bg-surface-2" />
           </div>
         ))}
       </div>
@@ -41,8 +44,13 @@ function PostsPage() {
     try {
       const result = await refreshPosts();
       if (!result.ok) toast.error(result.error);
-      else toast.success(`게시물 ${result.report.media}개, 댓글 ${result.report.comments}개`);
+      else
+        toast.success(
+          `게시물 ${result.report.media}개, 댓글 ${result.report.comments}개`,
+        );
       await router.invalidate();
+    } catch {
+      toast.error(copy.genericError);
     } finally {
       setBusy(false);
     }
@@ -52,20 +60,14 @@ function PostsPage() {
     <div>
       <PageHeader
         title="게시물"
-        description="미디어를 선택하면 해당 댓글 스레드로 이동합니다."
-        action={
-          <button
-            type="button"
-            disabled={busy}
-            className="h-11 rounded-md border border-border px-4 text-[13px] disabled:opacity-50"
-            onClick={() => void refresh()}
-          >
-            {busy ? "불러오는 중" : copy.refreshFromIg}
-          </button>
-        }
+        description="게시물별로 댓글을 확인하고 답장을 보낼 수 있습니다."
+        action={<RefreshButton busy={busy} onRefresh={() => void refresh()} />}
       />
-      {media.length === 0 ? <EmptyState title={copy.emptyPosts} /> : <MediaGrid media={media} />}
-      <RefreshOverlay busy={busy} />
+      {media.length === 0 ? (
+        <EmptyState title={copy.emptyPosts} />
+      ) : (
+        <MediaGrid media={media} />
+      )}
     </div>
   );
 }

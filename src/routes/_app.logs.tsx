@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
-import { LogTable } from "@/components/log-table";
+import { LOG_TYPE_LABELS, LogTable } from "@/components/log-table";
 import { PageHeader } from "@/components/page-header";
 import { copy } from "@/lib/hypeup/copy";
 import { getLogsPage } from "@/lib/hypeup/api";
 import type { EventLogItem } from "@/lib/hypeup/types";
-
-const TYPES = ["", "AUTH", "WEBHOOK", "MATCH", "PUBLIC_REPLY", "PRIVATE_REPLY", "HIDE", "ERROR"];
 
 export const Route = createFileRoute("/_app/logs")({
   loader: () => getLogsPage({ data: {} }),
@@ -18,47 +17,75 @@ function LogsPage() {
   const initial = Route.useLoaderData();
   const [type, setType] = useState("");
   const [logs, setLogs] = useState<EventLogItem[]>(initial.logs);
-  const [offset, setOffset] = useState(initial.logs.length);
+  const [loading, setLoading] = useState(false);
+  const [exhausted, setExhausted] = useState(false);
 
-  async function applyType(next: string) {
-    setType(next);
-    const page = await getLogsPage({ data: { type: next || undefined, offset: 0 } });
-    setLogs(page.logs);
-    setOffset(page.logs.length);
+  async function load(next: string, append = false) {
+    setLoading(true);
+    try {
+      const page = await getLogsPage({
+        data: { type: next || undefined, offset: append ? logs.length : 0 },
+      });
+      setType(next);
+      setLogs((current) => (append ? [...current, ...page.logs] : page.logs));
+      setExhausted(page.logs.length === 0);
+    } catch {
+      toast.error(copy.genericError);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div>
-      <PageHeader title="로그" description="발송·매칭·오류 기록입니다." />
-      <div className="mb-4 flex flex-wrap gap-2">
-        {TYPES.map((value) => (
-          <button
-            key={value || "all"}
-            type="button"
-            onClick={() => void applyType(value)}
-            className={`h-10 rounded-md px-3 text-[12px] ${type === value ? "bg-fg text-bg" : "border border-border"}`}
-          >
-            {value || "전체"}
-          </button>
-        ))}
+    <div className="max-w-3xl">
+      <PageHeader
+        title="로그"
+        description="자동화 매칭, 메시지 발송, 오류 기록을 확인하세요."
+      />
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <label htmlFor="log-type" className="text-sm font-semibold">
+          활동 유형
+        </label>
+        <select
+          id="log-type"
+          className="lens-field min-h-12 w-auto min-w-36 px-3 text-[15px]"
+          value={type}
+          disabled={loading}
+          onChange={(event) => void load(event.target.value)}
+        >
+          <option value="">전체</option>
+          {Object.entries(LOG_TYPE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        {loading ? (
+          <span role="status" className="text-sm text-muted">
+            불러오는 중
+          </span>
+        ) : null}
       </div>
       {logs.length === 0 ? (
         <EmptyState title={copy.emptyLogs} />
       ) : (
-        <>
+        <div aria-busy={loading}>
           <LogTable logs={logs} />
-          <button
-            type="button"
-            className="mt-4 h-11 rounded-md border border-border px-4 text-[13px]"
-            onClick={async () => {
-              const page = await getLogsPage({ data: { type: type || undefined, offset } });
-              setLogs((current) => [...current, ...page.logs]);
-              setOffset((value) => value + page.logs.length);
-            }}
-          >
-            더 보기
-          </button>
-        </>
+          {!exhausted ? (
+            <button
+              type="button"
+              className="lens-button lens-button-secondary mt-4"
+              disabled={loading}
+              onClick={() => void load(type, true)}
+            >
+              더 보기
+            </button>
+          ) : (
+            <p className="mt-4 text-sm text-muted" role="status">
+              마지막 기록입니다.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

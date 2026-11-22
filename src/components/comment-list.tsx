@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { initial, relativeTime } from "@/lib/hypeup/format";
 import type { CommentItem } from "@/lib/hypeup/types";
 import { cn } from "@/lib/utils";
@@ -9,38 +10,54 @@ export function CommentList({
 }: {
   comments: CommentItem[];
   selectedId?: string | null;
-  onSelect: (comment: CommentItem) => void;
+  onSelect: (comment: CommentItem, trigger: HTMLButtonElement) => void;
 }) {
   return (
-    <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
-      {comments.map((comment, index) => (
+    <ul className="lens-panel divide-y divide-border overflow-hidden">
+      {comments.map((comment) => (
         <li key={comment.id}>
           <button
             type="button"
-            onClick={() => onSelect(comment)}
+            onClick={(event) => onSelect(comment, event.currentTarget)}
+            aria-pressed={selectedId === comment.id}
             className={cn(
-              "flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors duration-150 hover:bg-surface-2",
-              selectedId === comment.id && "bg-surface-2",
+              "flex w-full items-start gap-2.5 px-3.5 py-4 text-left transition-colors duration-200 focus-visible:-outline-offset-2 sm:gap-3 sm:px-4",
+              selectedId === comment.id
+                ? "bg-accent-soft"
+                : "hover:bg-surface-2",
             )}
-            style={{ animationDelay: `${Math.min(index, 7) * 40}ms` }}
           >
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-bg text-[12px] text-muted">
+            <span
+              aria-hidden
+              className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-sm font-semibold text-muted"
+            >
               {initial(comment.igFromUsername)}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2">
-                <span className="truncate text-[13px] font-medium">
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="min-w-0 break-all text-sm font-semibold">
                   @{comment.igFromUsername ?? "unknown"}
                 </span>
-                <span className="ml-auto shrink-0 text-[11px] tabular-nums text-subtle">
+                <time
+                  dateTime={comment.timestamp ?? undefined}
+                  className="text-sm text-muted tabular-nums"
+                >
                   {relativeTime(comment.timestamp)}
-                </span>
+                </time>
               </span>
-              <span className="mt-1 block text-[13px] leading-5 text-fg/90">{comment.text}</span>
-              <span className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-subtle">
-                {comment.repliedPublic ? <span className="text-ok">공개 답글</span> : null}
-                {comment.repliedPrivate ? <span className="text-ok">DM</span> : null}
-                {comment.hidden ? <span className="text-danger">숨김</span> : null}
+              <span className="mt-1 block text-[15px] leading-6 break-words">
+                {comment.text}
+              </span>
+              <span className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-sm text-muted empty:hidden">
+                {comment.repliedPublic ? (
+                  <span className="text-ok">공개 답글</span>
+                ) : null}
+                {comment.repliedPrivate ? (
+                  <span className="text-ok">DM</span>
+                ) : null}
+                {comment.hidden ? (
+                  <span className="text-danger">숨김</span>
+                ) : null}
                 {comment.media?.caption ? (
                   <span className="truncate">{comment.media.caption}</span>
                 ) : null}
@@ -50,9 +67,16 @@ export function CommentList({
               <img
                 src={comment.media.thumbnailUrl}
                 alt=""
-                className="size-12 shrink-0 rounded-sm object-cover"
+                loading="lazy"
+                decoding="async"
+                className="size-11 shrink-0 rounded-sm object-cover"
               />
             ) : null}
+            <ChevronRight
+              aria-hidden
+              className="mt-1 size-4 shrink-0 self-center text-muted"
+              strokeWidth={1.6}
+            />
           </button>
         </li>
       ))}

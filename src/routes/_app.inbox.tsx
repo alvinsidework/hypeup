@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { InboxView } from "@/components/inbox-view";
 import { PageHeader } from "@/components/page-header";
-import { RefreshOverlay } from "@/components/refresh-overlay";
+import { RefreshButton } from "@/components/refresh-button";
 import { copy } from "@/lib/hypeup/copy";
 import { getInbox, refreshPosts } from "@/lib/hypeup/api";
 
@@ -17,11 +17,17 @@ export const Route = createFileRoute("/_app/inbox")({
 
 function InboxPending() {
   return (
-    <div>
-      <PageHeader title="인박스" description="불러오는 중" />
-      <div className="space-y-2">
+    <div aria-busy="true">
+      <PageHeader title="인박스" />
+      <div className="lens-panel divide-y divide-border" aria-hidden>
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="h-16 animate-pulse rounded-lg border border-border bg-surface-2" />
+          <div key={index} className="flex items-center gap-3 p-4">
+            <div className="size-10 shrink-0 animate-pulse rounded-full bg-surface-2" />
+            <div className="grid flex-1 gap-2">
+              <div className="h-3 w-24 animate-pulse rounded-full bg-surface-2" />
+              <div className="h-3 w-2/3 animate-pulse rounded-full bg-surface-2" />
+            </div>
+          </div>
         ))}
       </div>
     </div>
@@ -53,6 +59,9 @@ function InboxPage() {
           : summary,
       );
       await router.invalidate();
+    } catch {
+      toast.error(copy.genericError);
+      setReport(copy.genericError);
     } finally {
       setBusy(false);
     }
@@ -62,38 +71,39 @@ function InboxPage() {
     <div>
       <PageHeader
         title="인박스"
-        description="다른 계정이 단 댓글은 새로고침해야 들어옵니다. 웹훅이 없으면 실시간 알림은 없습니다."
+        description="받은 댓글을 모아 보고, 공개 답글이나 DM을 보내세요."
         action={
-          <button
-            type="button"
-            disabled={busy}
-            className="h-11 rounded-md border border-border px-4 text-[13px] disabled:opacity-50"
-            onClick={() => void refresh()}
-          >
-            {busy ? "불러오는 중" : copy.refreshFromIg}
-          </button>
+          comments.length ? (
+            <RefreshButton busy={busy} onRefresh={() => void refresh()} />
+          ) : null
         }
       />
-      {report ? <p className="mb-4 text-[13px] text-muted">{report}</p> : null}
+      {report ? (
+        <p
+          role="status"
+          className="mb-4 rounded-md bg-surface-2 px-4 py-3 text-sm text-muted"
+        >
+          {report}
+        </p>
+      ) : null}
       {comments.length === 0 ? (
         <EmptyState
           title={copy.emptyComments}
           body="Instagram에서 새로고침을 누르면 최근 게시물의 댓글을 가져오고, 맞는 룰이 있으면 답글을 보냅니다."
           action={
-            <button
-              type="button"
-              disabled={busy}
-              className="h-11 rounded-md bg-fg px-4 text-[13px] text-bg disabled:opacity-50"
-              onClick={() => void refresh()}
-            >
-              {busy ? "불러오는 중" : copy.refreshFromIg}
-            </button>
+            <RefreshButton
+              busy={busy}
+              onRefresh={() => void refresh()}
+              primary
+            />
           }
         />
       ) : (
-        <InboxView comments={comments} onRefresh={() => void router.invalidate()} />
+        <InboxView
+          comments={comments}
+          onRefresh={() => void router.invalidate()}
+        />
       )}
-      <RefreshOverlay busy={busy} />
     </div>
   );
 }

@@ -4,45 +4,71 @@ import { legal } from "@/lib/hypeup/legal";
 export function SiteFooter({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
-      <div className="space-y-1 px-2 text-[11px] leading-4 text-subtle">
+      <div className="space-y-1 px-2 text-sm leading-5 text-muted">
         <p>{legal.company}</p>
-        <div className="flex flex-wrap gap-x-2">
-          <Link to="/privacy" className="hover:text-muted">
+        <nav aria-label="서비스 정책" className="flex flex-wrap gap-x-3">
+          <Link
+            to="/privacy"
+            className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
+          >
             개인정보처리방침
           </Link>
-          <Link to="/terms" className="hover:text-muted">
+          <Link
+            to="/terms"
+            className="inline-flex min-h-11 items-center transition-colors hover:text-fg"
+          >
             이용약관
           </Link>
-        </div>
+        </nav>
       </div>
     );
   }
 
   return (
-    <footer className="border-t border-border px-4 py-8 text-[12px] leading-6 text-muted">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <footer className="border-t border-border text-sm leading-6 text-muted">
+      <div className="mx-auto flex max-w-[1120px] flex-col gap-4 px-5 pt-5 pb-[calc(1.75rem+env(safe-area-inset-bottom))] sm:flex-row sm:items-start sm:justify-between sm:px-8 sm:pt-7">
         <div>
-          <p className="font-medium text-fg">{legal.company}</p>
-          <p className="mt-1">대표 {legal.ceo} · 사업자등록번호 {legal.bizNo}</p>
+          <p className="font-semibold text-fg">{legal.company}</p>
+          <p className="mt-1">
+            대표 {legal.ceo} · 사업자등록번호 {legal.bizNo}
+          </p>
           <p>{legal.address}</p>
           <p>
-            <a className="hover:text-fg" href={`mailto:${legal.email}`}>
+            <a
+              className="transition-colors hover:text-fg"
+              href={`mailto:${legal.email}`}
+            >
               {legal.email}
             </a>
             {" · "}
-            <a className="hover:text-fg" href={legal.phoneHref}>
+            <a
+              className="transition-colors hover:text-fg"
+              href={legal.phoneHref}
+            >
               {legal.phoneDisplay}
             </a>
           </p>
         </div>
-        <nav className="flex flex-wrap gap-x-4 gap-y-1">
-          <Link to="/privacy" className="hover:text-fg">
+        <nav
+          aria-label="서비스 정책"
+          className="flex flex-wrap items-center gap-x-4 gap-y-1"
+        >
+          <Link
+            to="/privacy"
+            className="inline-flex min-h-11 items-center rounded-sm transition-colors hover:text-fg"
+          >
             개인정보처리방침
           </Link>
-          <Link to="/terms" className="hover:text-fg">
+          <Link
+            to="/terms"
+            className="inline-flex min-h-11 items-center rounded-sm transition-colors hover:text-fg"
+          >
             이용약관
           </Link>
-          <Link to="/data-deletion" className="hover:text-fg">
+          <Link
+            to="/data-deletion"
+            className="inline-flex min-h-11 items-center rounded-sm transition-colors hover:text-fg"
+          >
             데이터 삭제 요청
           </Link>
         </nav>

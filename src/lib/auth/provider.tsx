@@ -19,13 +19,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       {children}
       <Toaster
-        theme="dark"
         position="top-center"
         toastOptions={{
           style: {
-            background: "#141416",
-            color: "#f4f1ea",
-            border: "1px solid color-mix(in oklab, #f4f1ea 12%, transparent)",
+            background: "var(--color-surface)",
+            color: "var(--color-fg)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--lens-shadow)",
           },
         }}
       />

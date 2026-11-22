@@ -1,5 +1,6 @@
 import { getSql } from "@/lib/db";
 import { encryptToken, newId } from "./crypto.server";
+import { PORTFOLIO_METRICS, PORTFOLIO_METRIC_LABEL, type PortfolioMetric } from "./portfolio-metrics";
 import {
   CHANNEL_LABEL,
   FORMAT_LABEL,
@@ -70,6 +71,8 @@ export type PageDraft = {
   isPublic: boolean;
   notifyEmail: boolean;
   payoutLabel: string | null;
+  hasCustomPhoto: boolean;
+  customPhotoUrl: string | null;
 };
 
 export type PublicPage = {
@@ -78,7 +81,7 @@ export type PublicPage = {
   bio: string;
   categories: string[];
   avatarUrl: string | null;
-  channels: { key: string; label: string; handle: string; followers: number }[];
+  channels: { key: string; label: string; handle: string; followers: number | null }[];
   rates: {
     id: string;
     title: string;
@@ -96,6 +99,7 @@ export type PublicPage = {
     formatLabel: string;
     postUrl: string | null;
     coverUrl: string | null;
+    mediaType?: string | null;
     postedMonth: string | null;
     highlightLabel: string | null;
     highlightValue: string | null;
@@ -122,6 +126,7 @@ type PageRow = {
   bank_name: string | null;
   account_last4: string | null;
   account_holder: string | null;
+  profile_photo_key: string | null;
 };
 
 function linksOf(value: unknown): PageLink[] {
@@ -149,12 +154,14 @@ function mapPage(row: PageRow): PageDraft {
     isPublic: row.is_public,
     notifyEmail: row.notify_email,
     payoutLabel: row.account_last4 ? maskAccount(row.bank_name ?? "", row.account_last4) : null,
+    hasCustomPhoto: Boolean(row.profile_photo_key),
+    customPhotoUrl: row.profile_photo_key ? `/api/lens/profile-photo?key=${row.profile_photo_key}` : null,
   };
 }
 
 const PAGE_COLUMNS = `user_id, username, display_name, bio, categories, instagram_handle, instagram_followers,
   tiktok_handle, tiktok_followers, youtube_handle, youtube_followers, links, is_public, notify_email,
-  bank_name, account_last4, account_holder`;
+  bank_name, account_last4, account_holder, profile_photo_key`;
 
 export async function getPage(userId: string): Promise<PageDraft | null> {
   const sql = await getSql();
@@ -164,7 +171,9 @@ export async function getPage(userId: string): Promise<PageDraft | null> {
 
 export async function savePage(
   userId: string,
-  page: Omit<PageDraft, "payoutLabel" | "notifyEmail"> & { notifyEmail?: boolean },
+  page: Omit<PageDraft, "payoutLabel" | "notifyEmail" | "hasCustomPhoto" | "customPhotoUrl"> & {
+    profilePhoto?: string | null;
+  },
 ): Promise<Ok<{ page: PageDraft }> | Err> {
   const sql = await getSql();
   const username = page.username || null;
@@ -172,8 +181,9 @@ export async function savePage(
     await sql.query(
       `insert into hypeup_page (
         user_id, username, display_name, bio, categories, instagram_handle, instagram_followers,
-        tiktok_handle, tiktok_followers, youtube_handle, youtube_followers, links, is_public, updated_at
-      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13, now())
+        tiktok_handle, tiktok_followers, youtube_handle, youtube_followers, links, is_public,
+        profile_photo, profile_photo_key, updated_at
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,decode($14, 'base64'),$15,now())
       on conflict (user_id) do update set
         username = excluded.username,
         display_name = excluded.display_name,
@@ -187,6 +197,8 @@ export async function savePage(
         youtube_followers = excluded.youtube_followers,
         links = excluded.links,
         is_public = excluded.is_public,
+        profile_photo = case when $16 then excluded.profile_photo else hypeup_page.profile_photo end,
+        profile_photo_key = case when $16 then excluded.profile_photo_key else hypeup_page.profile_photo_key end,
         updated_at = now()`,
       [
         userId,
@@ -202,6 +214,9 @@ export async function savePage(
         page.youtubeFollowers,
         JSON.stringify(page.links),
         page.isPublic,
+        page.profilePhoto ?? null,
+        page.profilePhoto ? newId() : null,
+        page.profilePhoto !== undefined,
       ],
     );
   } catch (error) {
@@ -211,6 +226,16 @@ export async function savePage(
   const saved = await getPage(userId);
   if (!saved) return { ok: false, error: "페이지를 저장하지 못했습니다." };
   return { ok: true, page: saved };
+}
+
+export async function getProfilePhoto(key: string, viewerId: string | null): Promise<Uint8Array | null> {
+  const sql = await getSql();
+  const [row] = await sql.query<{ profile_photo: Uint8Array | null }>(
+    `select profile_photo from hypeup_page where profile_photo_key = $1
+       and ((is_public and username is not null) or user_id = $2)`,
+    [key, viewerId],
+  );
+  return row?.profile_photo ?? null;
 }
 
 export async function savePrivate(
@@ -424,6 +449,9 @@ export type WorkItem = {
   highlightValue: string;
   stats: { label: string; value: string }[];
   isPublic: boolean;
+  instagramMediaId: string | null;
+  publicMetrics: PortfolioMetric[];
+  viewCount: number | null;
 };
 
 type WorkRow = {
@@ -439,7 +467,27 @@ type WorkRow = {
   highlight_value: string | null;
   stats: unknown;
   is_public: boolean;
+  instagram_media_id: string | null;
+  public_metrics: string[];
+  view_count: number | null;
+  instagram_post_url: string | null;
+  instagram_cover_url: string | null;
+  instagram_media_type: string | null;
+  likes: number | null;
+  comments: number | null;
 };
+
+const WORK_SELECT = `select w.id, w.title, w.brand_name, w.channel, w.format,
+    w.post_url, w.cover_url, w.posted_month, w.highlight_label, w.highlight_value, w.stats, w.is_public,
+    w.instagram_media_id, w.public_metrics, w.view_count, m.permalink as instagram_post_url,
+    case when m.media_type in ('VIDEO', 'REELS') then m.thumbnail_url
+      else coalesce(m.thumbnail_url, m.media_url) end as instagram_cover_url,
+    m.media_type as instagram_media_type, m.like_count as likes, m.comments_count as comments
+  from hypeup_work w left join hypeup_media m on m.id = w.instagram_media_id and m.user_id = w.user_id`;
+
+function metricsOf(row: WorkRow): PortfolioMetric[] {
+  return PORTFOLIO_METRICS.filter((metric) => row.public_metrics.includes(metric));
+}
 
 function mapStats(value: unknown): { label: string; value: string }[] {
   if (!Array.isArray(value)) return [];
@@ -457,25 +505,36 @@ function mapWork(row: WorkRow): WorkItem {
     brandName: row.brand_name ?? "",
     channel: row.channel as WorkChannel,
     format: row.format as DealFormat,
-    postUrl: row.post_url ?? "",
-    coverUrl: row.cover_url ?? "",
+    postUrl: row.instagram_post_url ?? row.post_url ?? "",
+    coverUrl: row.instagram_cover_url ?? row.cover_url ?? "",
     postedMonth: row.posted_month ?? "",
     highlightLabel: row.highlight_label ?? "",
     highlightValue: row.highlight_value ?? "",
     stats: mapStats(row.stats),
     isPublic: row.is_public,
+    instagramMediaId: row.instagram_media_id,
+    publicMetrics: metricsOf(row),
+    viewCount: row.view_count,
   };
 }
 
-export async function listWorks(userId: string): Promise<WorkItem[]> {
+async function listWorkRows(userId: string, publicOnly = false): Promise<WorkRow[]> {
   const sql = await getSql();
-  const rows = await sql.query<WorkRow>(
-    `select id, title, brand_name, channel, format, post_url, cover_url, posted_month, highlight_label,
-      highlight_value, stats, is_public
-     from hypeup_work where user_id = $1 order by sort_order asc, created_at asc`,
+  return sql.query<WorkRow>(
+    `${WORK_SELECT} where w.user_id = $1${publicOnly ? " and w.is_public = true" : ""}
+      order by w.sort_order asc, w.created_at asc`,
     [userId],
   );
-  return rows.map(mapWork);
+}
+
+export async function listWorks(userId: string): Promise<WorkItem[]> {
+  return (await listWorkRows(userId)).map(mapWork);
+}
+
+export async function getWork(userId: string, id: string): Promise<WorkItem | null> {
+  const sql = await getSql();
+  const [row] = await sql.query<WorkRow>(`${WORK_SELECT} where w.user_id = $1 and w.id = $2`, [userId, id]);
+  return row ? mapWork(row) : null;
 }
 
 export async function saveWork(userId: string, work: Omit<WorkItem, "id"> & { id?: string }): Promise<Ok<{ works: WorkItem[] }> | Err> {
@@ -507,22 +566,31 @@ export async function saveWork(userId: string, work: Omit<WorkItem, "id"> & { id
     work.highlightValue || null,
     JSON.stringify(work.stats),
     work.isPublic,
+    work.instagramMediaId,
+    work.publicMetrics,
+    work.viewCount,
   ];
-  if (existing.length) {
-    await sql.query(
-      `update hypeup_work set title=$3, brand_name=$4, channel=$5, format=$6, post_url=$7, cover_url=$8,
-        posted_month=$9, highlight_label=$10, highlight_value=$11, stats=$12::jsonb, is_public=$13
-       where id=$1 and user_id=$2`,
-      [id, userId, ...params],
-    );
-  } else {
-    await sql.query(
-      `insert into hypeup_work (
-        id, user_id, sort_order, title, brand_name, channel, format, post_url, cover_url, posted_month,
-        highlight_label, highlight_value, stats, is_public
-      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14)`,
-      [id, userId, sort, ...params],
-    );
+  try {
+    if (existing.length) {
+      await sql.query(
+        `update hypeup_work set title=$3, brand_name=$4, channel=$5, format=$6, post_url=$7, cover_url=$8,
+          posted_month=$9, highlight_label=$10, highlight_value=$11, stats=$12::jsonb, is_public=$13,
+          instagram_media_id=$14, public_metrics=$15, view_count=$16
+         where id=$1 and user_id=$2`,
+        [id, userId, ...params],
+      );
+    } else {
+      await sql.query(
+        `insert into hypeup_work (
+          id, user_id, sort_order, title, brand_name, channel, format, post_url, cover_url, posted_month,
+          highlight_label, highlight_value, stats, is_public, instagram_media_id, public_metrics, view_count
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17)`,
+        [id, userId, sort, ...params],
+      );
+    }
+  } catch (error) {
+    if (work.instagramMediaId && isUnique(error)) return { ok: false, error: "이미 포트폴리오에 추가한 게시물입니다." };
+    throw error;
   }
   return { ok: true, works: await listWorks(userId) };
 }
@@ -552,8 +620,17 @@ export async function moveWork(userId: string, id: string, direction: "up" | "do
 }
 
 function channel(key: string, label: string, handle: string | null, followers: number | null) {
-  if (!handle || !followers) return [];
+  if (!handle) return [];
   return [{ key, label, handle, followers }];
+}
+
+function publicWorkStats(row: WorkRow): PublicPage["works"][number]["stats"] {
+  if (!row.instagram_media_id) return mapStats(row.stats).slice(0, 4);
+  const counts = { views: row.view_count, comments: row.comments, likes: row.likes };
+  return metricsOf(row).flatMap((metric) => {
+    const count = counts[metric];
+    return count == null ? [] : [{ label: PORTFOLIO_METRIC_LABEL[metric], value: count.toLocaleString("ko-KR") }];
+  });
 }
 
 export async function getPublicPage(username: string): Promise<PublicPage | null> {
@@ -563,7 +640,7 @@ export async function getPublicPage(username: string): Promise<PublicPage | null
   >(
     `select p.user_id, p.username, p.display_name, p.bio, p.categories, p.instagram_handle, p.instagram_followers,
       p.tiktok_handle, p.tiktok_followers, p.youtube_handle, p.youtube_followers, p.links, p.is_public,
-      p.notify_email, p.bank_name, p.account_last4, p.account_holder, u.profile_picture_url
+      p.notify_email, p.bank_name, p.account_last4, p.account_holder, p.profile_photo_key, u.profile_picture_url
      from hypeup_page p
      join hypeup_user u on u.id = p.user_id
      where p.username = $1 and p.is_public = true`,
@@ -571,28 +648,35 @@ export async function getPublicPage(username: string): Promise<PublicPage | null
   );
   const row = rows[0];
   if (!row?.username) return null;
-  const rates = await sql.query<RateRow>(
-    `select id, sort_order, format, title, model, amount_krw, rate_bps, price_hidden, deliverable_count, description,
-      revisions, turnaround_days, usage_days, paid_ads, raw_files, exclusivity_days, exclusivity_category, is_public
-     from hypeup_rate where user_id = $1 and is_public = true order by sort_order asc, created_at asc`,
-    [row.user_id],
-  );
-  const works = await sql.query<WorkRow>(
-    `select id, title, brand_name, channel, format, post_url, cover_url, posted_month, highlight_label,
-      highlight_value, stats, is_public
-     from hypeup_work where user_id = $1 and is_public = true order by sort_order asc, created_at asc`,
-    [row.user_id],
-  );
+  return buildPublicPage(row.user_id, mapPage(row), row.username, row.profile_picture_url);
+}
+
+export async function buildPublicPage(
+  userId: string,
+  page: PageDraft,
+  username: string,
+  instagramAvatarUrl: string | null,
+): Promise<PublicPage> {
+  const sql = await getSql();
+  const [rates, works] = await Promise.all([
+    sql.query<RateRow>(
+      `select id, sort_order, format, title, model, amount_krw, rate_bps, price_hidden, deliverable_count, description,
+        revisions, turnaround_days, usage_days, paid_ads, raw_files, exclusivity_days, exclusivity_category, is_public
+       from hypeup_rate where user_id = $1 and is_public = true order by sort_order asc, created_at asc`,
+      [userId],
+    ),
+    listWorkRows(userId, true),
+  ]);
   return {
-    username: row.username,
-    displayName: row.display_name || row.username,
-    bio: row.bio,
-    categories: textArray(row.categories).slice(0, 3),
-    avatarUrl: row.profile_picture_url,
+    username,
+    displayName: page.displayName || username,
+    bio: page.bio,
+    categories: page.categories.slice(0, 3),
+    avatarUrl: page.customPhotoUrl ?? instagramAvatarUrl,
     channels: [
-      ...channel("instagram", "인스타그램", row.instagram_handle, row.instagram_followers),
-      ...channel("tiktok", "틱톡", row.tiktok_handle, row.tiktok_followers),
-      ...channel("youtube", "유튜브", row.youtube_handle, row.youtube_followers),
+      ...channel("instagram", "인스타그램", page.instagramHandle, page.instagramFollowers),
+      ...channel("tiktok", "틱톡", page.tiktokHandle, page.tiktokFollowers),
+      ...channel("youtube", "유튜브", page.youtubeHandle, page.youtubeFollowers),
     ],
     rates: rates.map((rate) => ({
       id: rate.id,
@@ -614,14 +698,15 @@ export async function getPublicPage(username: string): Promise<PublicPage | null
       brandName: work.brand_name?.trim() || "브랜드 비공개",
       channelLabel: CHANNEL_LABEL[work.channel as WorkChannel] ?? work.channel,
       formatLabel: FORMAT_LABEL[work.format as DealFormat] ?? work.format,
-      postUrl: work.post_url,
-      coverUrl: work.cover_url,
+      postUrl: work.instagram_post_url ?? work.post_url,
+      coverUrl: work.instagram_cover_url ?? work.cover_url,
+      mediaType: work.instagram_media_type,
       postedMonth: work.posted_month,
-      highlightLabel: work.highlight_label,
-      highlightValue: work.highlight_value,
-      stats: mapStats(work.stats).slice(0, 4),
+      highlightLabel: work.instagram_media_id ? null : work.highlight_label,
+      highlightValue: work.instagram_media_id ? null : work.highlight_value,
+      stats: publicWorkStats(work),
     })),
-    links: linksOf(row.links).slice(0, 5),
+    links: page.links.slice(0, 5),
   };
 }
 

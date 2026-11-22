@@ -42,7 +42,7 @@ const NAV_GROUPS = [
   {
     label: "크리에이터",
     items: [
-      { to: "/page", label: "공개 페이지", icon: FileText },
+      { to: "/page", label: "내 페이지", icon: FileText },
       { to: "/portfolio", label: "포트폴리오", icon: Images },
       { to: "/rates", label: "단가", icon: BadgeDollarSign },
       { to: "/inquiries", label: "브랜드 문의", icon: MessageCircle },
@@ -142,6 +142,7 @@ export function AppShell({
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
+  const compact = pathname !== "/";
   const [menuOpen, setMenuOpen] = useState(false);
   const swipeStart = useRef<{ x: number; y: number; time: number } | null>(
     null,
@@ -215,22 +216,28 @@ export function AppShell({
         >
           본문으로 이동
         </a>
-        <header className="sticky top-0 z-30 border-b border-border bg-bg pt-[env(safe-area-inset-top)]">
-          <div className="mx-auto flex min-h-[68px] max-w-[1152px] items-center justify-between gap-4 px-4 sm:px-8 lg:min-h-[76px]">
+        <header
+          className="lens-workspace-header sticky top-0 z-30 border-b border-border bg-bg pt-[env(safe-area-inset-top)]"
+          data-compact={compact}
+        >
+          <div className="lens-workspace-toolbar mx-auto flex min-h-[68px] max-w-[1152px] items-center gap-4 px-4 sm:px-8 lg:min-h-[76px]">
             <Link
               to="/"
               aria-label="Lens 홈"
-              className="inline-flex min-h-11 items-center gap-2.5 rounded-md"
+              className={cn(
+                "inline-flex min-h-11 items-center gap-2.5 rounded-md",
+                compact && "lens-secondary-brand",
+              )}
             >
               <LogoMark className="size-8" />
               <Wordmark />
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
               <PwaInstallButton />
               <Dialog.Trigger asChild>
                 <button
                   type="button"
-                  className="flex min-h-11 items-center gap-2 rounded-full bg-surface-2 px-3 text-sm font-semibold transition-colors hover:bg-border sm:px-3.5"
+                  className="lens-workspace-menu flex min-h-11 items-center gap-2 rounded-full bg-surface-2 px-3 text-sm font-semibold transition-colors hover:bg-border sm:px-3.5"
                   aria-label="워크스페이스 메뉴 열기"
                 >
                   <Menu
@@ -238,7 +245,9 @@ export function AppShell({
                     strokeWidth={1.85}
                     aria-hidden
                   />
-                  <span>메뉴</span>
+                  <span className={compact ? "lens-secondary-brand" : undefined}>
+                    메뉴
+                  </span>
                 </button>
               </Dialog.Trigger>
             </div>
@@ -249,7 +258,10 @@ export function AppShell({
         <main
           id="lens-content"
           tabIndex={-1}
-          className="mx-auto w-full max-w-[1152px] px-4 pt-7 pb-[calc(32px+env(safe-area-inset-bottom))] outline-none sm:px-8 sm:pt-10"
+          className={cn(
+            "mx-auto w-full max-w-[1152px] px-4 pt-7 pb-[calc(32px+env(safe-area-inset-bottom))] outline-none sm:px-8 sm:pt-10",
+            compact && "lens-compact-content",
+          )}
         >
           <div key={pathname} className="lens-reveal min-w-0">
             {children}

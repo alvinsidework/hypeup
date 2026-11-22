@@ -277,6 +277,10 @@
     pointer-events: none;
   }
 
+  .lens-task-progress-position {
+    z-index: 65;
+  }
+
   .lens-progress-card {
     display: flex;
     align-items: center;
@@ -285,10 +289,20 @@
     padding: 12px 19px 12px 13px;
     border: 1px solid var(--color-border);
     border-radius: 22px;
-    background-color: var(--color-surface);
+    background-color: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(12px);
     color: var(--color-fg);
     box-shadow: var(--lens-shadow);
     animation: lens-progress-in var(--lens-motion) var(--lens-ease) both;
+  }
+
+  .lens-navigation-spinner {
+    width: 30px;
+    height: 30px;
+    border: 2.5px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+    border-top-color: var(--color-accent);
+    border-radius: 50%;
+    animation: lens-progress-orbit 800ms linear infinite;
   }
 
   .lens-progress-position[data-finishing] .lens-progress-card {
@@ -431,6 +445,30 @@
 @keyframes lens-progress-orbit {
   to {
     transform: rotate(1turn);
+  }
+}
+
+@media (width < 48rem), (display-mode: standalone) {
+  .lens-secondary-brand {
+    display: none !important;
+  }
+
+  .lens-workspace-header[data-compact="true"] {
+    border-color: transparent;
+  }
+
+  .lens-workspace-header[data-compact="true"] .lens-workspace-toolbar {
+    min-height: 56px;
+  }
+
+  .lens-workspace-header[data-compact="true"] .lens-workspace-menu {
+    width: 44px;
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .lens-compact-content {
+    padding-top: 1rem;
   }
 }
 

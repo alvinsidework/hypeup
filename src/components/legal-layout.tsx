@@ -11,7 +11,7 @@ export function LegalLayout({
   children: ReactNode;
 }) {
   return (
-    <PublicLayout>
+    <PublicLayout secondary>
       <main className="lens-reveal mx-auto w-full max-w-[792px] flex-1 px-5 pt-5 pb-16 sm:px-8 sm:pt-9 sm:pb-24">
         <Link
           to="/"

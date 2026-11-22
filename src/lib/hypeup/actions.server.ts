@@ -122,6 +122,36 @@ async function importComments(userId: string, token: string, mediaId: string): P
   return comments.length;
 }
 
+async function readMediaPage(token: string, after?: string) {
+  const page = await listMyMedia(token, after);
+  const media: MediaItem[] = (page.data ?? []).map((item) => {
+    const mediaType = item.media_type ?? "IMAGE";
+    const isVideo = mediaType === "REELS" || mediaType === "VIDEO";
+    return {
+      id: item.id,
+      caption: item.caption ?? null,
+      mediaType,
+      mediaUrl: item.media_url ?? null,
+      thumbnailUrl: item.thumbnail_url ?? (isVideo ? null : (item.media_url ?? null)),
+      permalink: item.permalink ?? null,
+      timestamp: item.timestamp ?? null,
+      likeCount: item.like_count ?? null,
+      commentsCount: item.comments_count ?? null,
+    };
+  });
+  const cursor = page.paging?.next ? page.paging.cursors?.after : undefined;
+  return { media, nextAfter: cursor && cursor !== after ? cursor : null };
+}
+
+export async function syncPortfolioMedia(user: UserRecord, after?: string) {
+  if (user.isDemo || isDemoMode()) return { media: await listMedia(user.id), nextAfter: null };
+  const token = plainToken(user);
+  if (!token) throw new Error("token_expired");
+  const page = await readMediaPage(token, after);
+  await upsertMediaBatch(user.id, page.media);
+  return page;
+}
+
 export async function syncFromInstagram(
   user: UserRecord,
   input: InstagramSyncInput,
@@ -167,22 +197,7 @@ export async function syncFromInstagram(
   }
 
   publish({ type: "progress", label: "Instagram 게시물 확인 중" });
-  const page = await listMyMedia(token);
-  const media: MediaItem[] = (page.data ?? []).map((item) => {
-    const mediaType = item.media_type ?? "IMAGE";
-    const isVideo = mediaType === "REELS" || mediaType === "VIDEO";
-    return {
-      id: item.id,
-      caption: item.caption ?? null,
-      mediaType,
-      mediaUrl: item.media_url ?? null,
-      thumbnailUrl: item.thumbnail_url ?? (isVideo ? null : (item.media_url ?? null)),
-      permalink: item.permalink ?? null,
-      timestamp: item.timestamp ?? null,
-      likeCount: item.like_count ?? null,
-      commentsCount: item.comments_count ?? null,
-    };
-  });
+  const { media } = await readMediaPage(token);
   publish({
     type: "progress",
     label: "게시물 목록 정리 중",

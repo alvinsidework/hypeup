@@ -33,7 +33,7 @@ function InquiryPage() {
   if (!data.ready) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-5 px-6 text-center">
-        <LogoMark className="size-12" />
+        <LogoMark className="lens-secondary-brand size-12" />
         <h1 className="text-2xl font-semibold tracking-tight">
           페이지를 준비 중이에요
         </h1>
@@ -91,7 +91,7 @@ function InquiryFlow({ data }: { data: Inquiry }) {
         <Link
           to="/"
           aria-label="Lens 홈"
-          className="flex min-h-11 items-center justify-self-center gap-2.5 rounded-full"
+          className="lens-secondary-brand flex min-h-11 items-center justify-self-center gap-2.5 rounded-full"
         >
           <LogoMark className="size-6" />
           <Wordmark />

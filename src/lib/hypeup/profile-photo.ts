@@ -1,0 +1,4 @@
+export const PROFILE_PHOTO_BYTES = 256 * 1024;
+export const PROFILE_PHOTO_DIMENSION = 512;
+export const PROFILE_PHOTO_BASE64_LENGTH =
+  4 * Math.ceil(PROFILE_PHOTO_BYTES / 3);

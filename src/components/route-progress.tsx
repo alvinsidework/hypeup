@@ -27,10 +27,6 @@ type ActiveTask = {
 };
 
 const TaskProgressContext = createContext<StartTask | null>(null);
-const NAVIGATION_TASK: ActiveTask = {
-  id: 0,
-  progress: { label: "페이지 불러오는 중" },
-};
 const SHOW_DELAY = 220;
 const EXIT_DURATION = 200;
 const COMPLETE_HOLD = 200;
@@ -106,9 +102,28 @@ function ProgressViewport({ task }: { task: ActiveTask | undefined }) {
       (state.isLoading || state.status === "pending") &&
       state.location.href !== state.resolvedLocation?.href,
   });
-  const current =
-    task && !task.finishing ? task : navigationPending ? NAVIGATION_TASK : task;
-  return current ? <DelayedProgress key={current.id} task={current} /> : null;
+  if (task && !task.finishing)
+    return <DelayedProgress key={task.id} task={task} />;
+  if (navigationPending) return <NavigationSpinner />;
+  return task ? <DelayedProgress key={task.id} task={task} /> : null;
+}
+
+function NavigationSpinner() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), SHOW_DELAY);
+    return () => window.clearTimeout(timer);
+  }, []);
+  if (!visible) return null;
+  return (
+    <div
+      className="lens-progress-position"
+      role="status"
+      aria-label="페이지 불러오는 중"
+    >
+      <span className="lens-navigation-spinner" aria-hidden="true" />
+    </div>
+  );
 }
 
 function DelayedProgress({ task }: { task: ActiveTask }) {
@@ -146,7 +161,7 @@ function ProgressCard({
 
   return (
     <div
-      className="lens-progress-position"
+      className="lens-progress-position lens-task-progress-position"
       data-finishing={finishing}
       aria-hidden={finishing === "dismissed" ? true : undefined}
     >

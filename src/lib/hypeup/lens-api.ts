@@ -3,17 +3,20 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie, getRequest, setCookie } from "@tanstack/react-start/server";
 import { SignJWT, jwtVerify } from "jose";
 import { z } from "zod";
-import { AuthRequiredError, requireUser } from "./actions.server";
+import { AuthRequiredError, requireUser, syncPortfolioMedia } from "./actions.server";
+import { copy } from "./copy";
 import { isSecureCookie } from "./env.server";
 import {
   applyDealAction,
   archiveThread,
+  buildPublicPage,
   deleteRate,
   deleteWork,
   getBrandThread,
   getInfluencerThread,
   getPage,
   getPublicPage,
+  getWork,
   listInquiries,
   listRates,
   listWorks,
@@ -45,7 +48,12 @@ import {
   validateUsername,
   type TermsInput,
 } from "./lens-rules";
+import { PORTFOLIO_METRICS } from "./portfolio-metrics";
+import { PROFILE_PHOTO_BASE64_LENGTH } from "./profile-photo";
+import { isProfileJpeg } from "./profile-photo.server";
+import { getMedia, listMedia, type UserRecord } from "./repo";
 import { sessionSecretKey } from "./session.server";
+import { koreanError } from "@/lib/instagram/errors";
 
 const BRAND_COOKIE = "lens_brand";
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -113,19 +121,54 @@ function blankPage(name: string, handle: string, count: number | null): PageDraf
     isPublic: false,
     notifyEmail: true,
     payoutLabel: null,
+    hasCustomPhoto: false,
+    customPhotoUrl: null,
   };
+}
+
+async function loadProfileDraft(user: UserRecord) {
+  return (await getPage(user.id)) ?? blankPage(user.name ?? "", user.username, user.followersCount);
 }
 
 export const getLensDesk = createServerFn({ method: "GET" }).handler(async () => {
   const user = await requireUser();
-  const page = (await getPage(user.id)) ?? blankPage(user.name ?? "", user.username, user.followersCount);
+  const [page, rates, works] = await Promise.all([loadProfileDraft(user), listRates(user.id), listWorks(user.id)]);
   return {
     page,
-    rates: await listRates(user.id),
-    works: await listWorks(user.id),
+    rates,
+    works,
+    avatarUrl: page.customPhotoUrl ?? user.profilePictureUrl,
+    instagramAvatarUrl: user.profilePictureUrl,
     suggestion: suggestUsername(user.username),
   };
 });
+
+export const getLensPagePreview = createServerFn({ method: "GET" }).handler(async () => {
+  const user = await requireUser();
+  const page = await loadProfileDraft(user);
+  const username = page.username || suggestUsername(user.username) || "profile";
+  return buildPublicPage(user.id, page, username, user.profilePictureUrl);
+});
+
+export const getLensPortfolio = createServerFn({ method: "GET" }).handler(async () => {
+  const user = await requireUser();
+  const [works, media] = await Promise.all([listWorks(user.id), listMedia(user.id)]);
+  return { works, media };
+});
+
+export const fetchLensPortfolioMedia = createServerFn({ method: "POST" })
+  .validator(z.object({ after: z.string().min(1).max(2048).optional() }))
+  .handler(async ({ data }) => {
+    const user = await requireUser();
+    try {
+      return { ok: true as const, ...(await syncPortfolioMedia(user, data.after)) };
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error && error.message === "token_expired" ? copy.tokenExpired : koreanError(error),
+      };
+    }
+  });
 
 const linkSchema = z.object({ label: z.string().max(40), url: z.string().max(400) });
 
@@ -144,6 +187,7 @@ export const saveLensPage = createServerFn({ method: "POST" })
       youtubeFollowers: z.number().int().nullable(),
       links: z.array(linkSchema).max(5),
       isPublic: z.boolean(),
+      profilePhoto: z.string().max(PROFILE_PHOTO_BASE64_LENGTH).nullish(),
     }),
   )
   .handler(async ({ data }) => {
@@ -151,6 +195,9 @@ export const saveLensPage = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, error: "로그인이 필요합니다." };
     const displayName = data.displayName.trim();
     if (displayName.length < 1) return { ok: false as const, error: "이름을 입력해 주세요." };
+    if (typeof data.profilePhoto === "string" && !isProfileJpeg(data.profilePhoto)) {
+      return { ok: false as const, error: "대표 이미지를 다시 선택해 주세요." };
+    }
     const categories = data.categories.filter((item) => (CATEGORIES as readonly string[]).includes(item)).slice(0, 3);
     const links = [];
     for (const link of data.links) {
@@ -181,6 +228,7 @@ export const saveLensPage = createServerFn({ method: "POST" })
       youtubeFollowers: followers(data.youtubeFollowers),
       links,
       isPublic: data.isPublic,
+      profilePhoto: data.profilePhoto,
     });
   });
 
@@ -281,6 +329,9 @@ const workSchema = z.object({
   highlightValue: z.string().max(20),
   stats: z.array(z.object({ label: z.string().max(20), value: z.string().max(20) })).max(4),
   isPublic: z.boolean(),
+  instagramMediaId: z.string().min(1).max(128).nullish(),
+  publicMetrics: z.array(z.enum(PORTFOLIO_METRICS)).max(PORTFOLIO_METRICS.length).optional(),
+  viewCount: z.number().int().min(0).max(2_147_483_647).nullish(),
 });
 
 export const saveLensWork = createServerFn({ method: "POST" })
@@ -290,6 +341,28 @@ export const saveLensWork = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, error: "로그인이 필요합니다." };
     const title = data.title.trim();
     if (!title) return { ok: false as const, error: "제목을 입력해 주세요." };
+    const previous = data.id && data.instagramMediaId === undefined ? await getWork(user.id, data.id) : null;
+    const instagramMediaId = data.instagramMediaId === undefined ? (previous?.instagramMediaId ?? null) : data.instagramMediaId;
+    if (instagramMediaId) {
+      const media = await getMedia(user.id, instagramMediaId);
+      if (!media) return { ok: false as const, error: "연결된 계정의 게시물을 찾지 못했습니다." };
+      const video = media.mediaType === "VIDEO" || media.mediaType === "REELS";
+      return saveWork(user.id, {
+        ...data,
+        title,
+        channel: "instagram",
+        format: video ? "reel" : "feed",
+        instagramMediaId,
+        postUrl: media.permalink ?? "",
+        coverUrl: media.thumbnailUrl ?? (video ? "" : (media.mediaUrl ?? "")),
+        postedMonth: media.timestamp?.slice(0, 7) ?? "",
+        highlightLabel: "",
+        highlightValue: "",
+        stats: [],
+        publicMetrics: data.publicMetrics ?? previous?.publicMetrics ?? [],
+        viewCount: data.viewCount === undefined ? (previous?.viewCount ?? null) : data.viewCount,
+      });
+    }
     if (!isHttpUrl(data.coverUrl)) return { ok: false as const, error: "커버 이미지 주소가 필요합니다." };
     if (data.postUrl.trim() && !isHttpUrl(data.postUrl.trim())) {
       return { ok: false as const, error: "게시 주소는 http 또는 https 여야 합니다." };
@@ -300,7 +373,16 @@ export const saveLensWork = createServerFn({ method: "POST" })
     const stats = data.stats
       .map((stat) => ({ label: stat.label.trim(), value: stat.value.trim() }))
       .filter((stat) => stat.label && stat.value);
-    return saveWork(user.id, { ...data, title, postUrl: data.postUrl.trim(), coverUrl: data.coverUrl.trim(), stats });
+    return saveWork(user.id, {
+      ...data,
+      title,
+      postUrl: data.postUrl.trim(),
+      coverUrl: data.coverUrl.trim(),
+      stats,
+      instagramMediaId: null,
+      publicMetrics: [],
+      viewCount: null,
+    });
   });
 
 export const deleteLensWork = createServerFn({ method: "POST" })

@@ -30,12 +30,14 @@ import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppDealsIdRouteImport } from './routes/_app.deals.$id'
 import { Route as AppInquiriesIndexRouteImport } from './routes/_app.inquiries.index'
 import { Route as AppInquiriesIdRouteImport } from './routes/_app.inquiries.$id'
+import { Route as AppPagePreviewRouteImport } from './routes/_app.page_.preview'
 import { Route as AppPostsIndexRouteImport } from './routes/_app.posts.index'
 import { Route as AppPostsIdRouteImport } from './routes/_app.posts.$id'
 import { Route as ApiAuthInstagramRouteImport } from './routes/api/auth/instagram'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiCronRefreshTokensRouteImport } from './routes/api/cron/refresh-tokens'
 import { Route as ApiInstagramSyncRouteImport } from './routes/api/instagram/sync'
+import { Route as ApiLensProfilePhotoRouteImport } from './routes/api/lens/profile-photo'
 import { Route as ApiWebhooksInstagramRouteImport } from './routes/api/webhooks/instagram'
 import { Route as ApiAuthInstagramCallbackRouteImport } from './routes/api/auth/instagram.callback'
 import { Route as ApiAuthInstagramHandoffRouteImport } from './routes/api/auth/instagram.handoff'
@@ -144,6 +146,11 @@ const AppInquiriesIdRoute = AppInquiriesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AppInquiriesRoute,
 } as any)
+const AppPagePreviewRoute = AppPagePreviewRouteImport.update({
+  id: '/page_/preview',
+  path: '/page/preview',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPostsIndexRoute = AppPostsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -172,6 +179,11 @@ const ApiCronRefreshTokensRoute = ApiCronRefreshTokensRouteImport.update({
 const ApiInstagramSyncRoute = ApiInstagramSyncRouteImport.update({
   id: '/api/instagram/sync',
   path: '/api/instagram/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLensProfilePhotoRoute = ApiLensProfilePhotoRouteImport.update({
+  id: '/api/lens/profile-photo',
+  path: '/api/lens/profile-photo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWebhooksInstagramRoute = ApiWebhooksInstagramRouteImport.update({
@@ -211,11 +223,13 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/deals/$id': typeof AppDealsIdRoute
   '/inquiries/$id': typeof AppInquiriesIdRoute
+  '/page/preview': typeof AppPagePreviewRoute
   '/posts/$id': typeof AppPostsIdRoute
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/instagram/sync': typeof ApiInstagramSyncRoute
+  '/api/lens/profile-photo': typeof ApiLensProfilePhotoRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
   '/inquiries/': typeof AppInquiriesIndexRoute
   '/posts/': typeof AppPostsIndexRoute
@@ -240,11 +254,13 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/deals/$id': typeof AppDealsIdRoute
   '/inquiries/$id': typeof AppInquiriesIdRoute
+  '/page/preview': typeof AppPagePreviewRoute
   '/posts/$id': typeof AppPostsIdRoute
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/instagram/sync': typeof ApiInstagramSyncRoute
+  '/api/lens/profile-photo': typeof ApiLensProfilePhotoRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
   '/inquiries': typeof AppInquiriesIndexRoute
   '/posts': typeof AppPostsIndexRoute
@@ -273,11 +289,13 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/deals/$id': typeof AppDealsIdRoute
   '/_app/inquiries/$id': typeof AppInquiriesIdRoute
+  '/_app/page_/preview': typeof AppPagePreviewRoute
   '/_app/posts/$id': typeof AppPostsIdRoute
   '/api/auth/instagram': typeof ApiAuthInstagramRouteWithChildren
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/cron/refresh-tokens': typeof ApiCronRefreshTokensRoute
   '/api/instagram/sync': typeof ApiInstagramSyncRoute
+  '/api/lens/profile-photo': typeof ApiLensProfilePhotoRoute
   '/api/webhooks/instagram': typeof ApiWebhooksInstagramRoute
   '/_app/inquiries/': typeof AppInquiriesIndexRoute
   '/_app/posts/': typeof AppPostsIndexRoute
@@ -306,11 +324,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/deals/$id'
     | '/inquiries/$id'
+    | '/page/preview'
     | '/posts/$id'
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/instagram/sync'
+    | '/api/lens/profile-photo'
     | '/api/webhooks/instagram'
     | '/inquiries/'
     | '/posts/'
@@ -335,11 +355,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/deals/$id'
     | '/inquiries/$id'
+    | '/page/preview'
     | '/posts/$id'
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/instagram/sync'
+    | '/api/lens/profile-photo'
     | '/api/webhooks/instagram'
     | '/inquiries'
     | '/posts'
@@ -367,11 +389,13 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/deals/$id'
     | '/_app/inquiries/$id'
+    | '/_app/page_/preview'
     | '/_app/posts/$id'
     | '/api/auth/instagram'
     | '/api/auth/logout'
     | '/api/cron/refresh-tokens'
     | '/api/instagram/sync'
+    | '/api/lens/profile-photo'
     | '/api/webhooks/instagram'
     | '/_app/inquiries/'
     | '/_app/posts/'
@@ -392,6 +416,7 @@ export interface RootRouteChildren {
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiCronRefreshTokensRoute: typeof ApiCronRefreshTokensRoute
   ApiInstagramSyncRoute: typeof ApiInstagramSyncRoute
+  ApiLensProfilePhotoRoute: typeof ApiLensProfilePhotoRoute
   ApiWebhooksInstagramRoute: typeof ApiWebhooksInstagramRoute
 }
 
@@ -544,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInquiriesIdRouteImport
       parentRoute: typeof AppInquiriesRoute
     }
+    '/_app/page_/preview': {
+      id: '/_app/page_/preview'
+      path: '/page/preview'
+      fullPath: '/page/preview'
+      preLoaderRoute: typeof AppPagePreviewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/posts/': {
       id: '/_app/posts/'
       path: '/'
@@ -584,6 +616,13 @@ declare module '@tanstack/react-router' {
       path: '/api/instagram/sync'
       fullPath: '/api/instagram/sync'
       preLoaderRoute: typeof ApiInstagramSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lens/profile-photo': {
+      id: '/api/lens/profile-photo'
+      path: '/api/lens/profile-photo'
+      fullPath: '/api/lens/profile-photo'
+      preLoaderRoute: typeof ApiLensProfilePhotoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/webhooks/instagram': {
@@ -650,6 +689,7 @@ interface AppRouteChildren {
   AppRatesRoute: typeof AppRatesRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppDealsIdRoute: typeof AppDealsIdRoute
+  AppPagePreviewRoute: typeof AppPagePreviewRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -664,6 +704,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppRatesRoute: AppRatesRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppDealsIdRoute: AppDealsIdRoute,
+  AppPagePreviewRoute: AppPagePreviewRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -694,6 +735,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiCronRefreshTokensRoute: ApiCronRefreshTokensRoute,
   ApiInstagramSyncRoute: ApiInstagramSyncRoute,
+  ApiLensProfilePhotoRoute: ApiLensProfilePhotoRoute,
   ApiWebhooksInstagramRoute: ApiWebhooksInstagramRoute,
 }
 export const routeTree = rootRouteImport

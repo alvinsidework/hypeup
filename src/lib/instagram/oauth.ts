@@ -1,5 +1,5 @@
 import { formPost, graphGet, graphRawGet } from "./client";
-import { normalizeAuthCode } from "./oauth-parse.ts";
+import { isUnsupportedMethod, normalizeAuthCode } from "./oauth-parse.ts";
 import type { IgProfile, LongTokenResponse, ShortTokenResponse } from "./types";
 
 export const OAUTH_SCOPES = [
@@ -8,7 +8,7 @@ export const OAUTH_SCOPES = [
   "instagram_business_manage_messages",
 ].join(",");
 
-export { isProfessionalAccount, normalizeAuthCode, parseGrantedScopes } from "./oauth-parse.ts";
+export { isProfessionalAccount, isUnsupportedMethod, normalizeAuthCode, parseGrantedScopes } from "./oauth-parse.ts";
 
 export function authorizeUrl(input: {
   appId: string;
@@ -59,10 +59,22 @@ export async function exchangeLongLivedToken(input: {
   appSecret: string;
   shortLived: string;
 }): Promise<LongTokenResponse> {
+  const form = {
+    grant_type: "ig_exchange_token",
+    client_secret: input.appSecret,
+    access_token: input.shortLived,
+  };
+  // Instagram documents this as GET, then rejects GET with
+  // "Unsupported request - method type: get". Send the secret in a POST body.
+  try {
+    return await formPost<LongTokenResponse>("https://graph.instagram.com/access_token", form);
+  } catch (error) {
+    if (!isUnsupportedMethod(error)) throw error;
+  }
   const url = new URL("https://graph.instagram.com/access_token");
-  url.searchParams.set("grant_type", "ig_exchange_token");
-  url.searchParams.set("client_secret", input.appSecret);
-  url.searchParams.set("access_token", input.shortLived);
+  url.searchParams.set("grant_type", form.grant_type);
+  url.searchParams.set("client_secret", form.client_secret);
+  url.searchParams.set("access_token", form.access_token);
   return graphRawGet<LongTokenResponse>(url.toString());
 }
 

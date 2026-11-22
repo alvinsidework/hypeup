@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isProfessionalAccount, normalizeAuthCode, parseGrantedScopes } from "./oauth-parse.ts";
+import { isProfessionalAccount, isUnsupportedMethod, normalizeAuthCode, parseGrantedScopes } from "./oauth-parse.ts";
+
+test("recognizes Instagram's misleading method rejection", () => {
+  assert.equal(isUnsupportedMethod(new Error("Unsupported request - method type: get")), true);
+  assert.equal(isUnsupportedMethod(new Error("Unsupported request - method type: post")), true);
+  assert.equal(isUnsupportedMethod(new Error("invalid code")), false);
+});
 
 test("strips Instagram #_ suffix from the auth code", () => {
   assert.equal(normalizeAuthCode("AQ123#_"), "AQ123");

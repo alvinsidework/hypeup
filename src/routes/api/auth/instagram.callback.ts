@@ -15,6 +15,7 @@ import {
   exchangeShortLivedToken,
   fetchMe,
   isProfessionalAccount,
+  isUnsupportedMethod,
   parseGrantedScopes,
 } from "@/lib/instagram/oauth";
 import { subscribeApps } from "@/lib/instagram/messages";
@@ -70,16 +71,24 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
             redirectUri,
             code,
           });
-          const longLived = await exchangeLongLivedToken({
-            appSecret: instagramAppSecret()!,
-            shortLived: shortLived.access_token,
-          });
-          const me = await fetchMe(longLived.access_token);
+          let accessToken = shortLived.access_token;
+          let expiresIn = 60 * 60;
+          try {
+            const longLived = await exchangeLongLivedToken({
+              appSecret: instagramAppSecret()!,
+              shortLived: shortLived.access_token,
+            });
+            accessToken = longLived.access_token;
+            expiresIn = longLived.expires_in ?? 60 * 60 * 24 * 60;
+          } catch (exchangeError) {
+            if (!isUnsupportedMethod(exchangeError)) throw exchangeError;
+            console.error("[hypeup] long-lived token exchange rejected, continuing with the short-lived token");
+          }
+          const me = await fetchMe(accessToken);
           if (!isProfessionalAccount(me.account_type)) {
             return connectError(request, "personal_account", undefined, [clearState]);
           }
           const igUserId = String(me.user_id ?? me.id ?? shortLived.user_id);
-          const expiresIn = longLived.expires_in ?? 60 * 60 * 24 * 60;
           const user = await upsertUser({
             igUserId,
             username: me.username,
@@ -88,7 +97,7 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
             profilePictureUrl: me.profile_picture_url ?? null,
             followersCount: me.followers_count ?? null,
             mediaCount: me.media_count ?? null,
-            tokenCipher: encryptToken(longLived.access_token),
+            tokenCipher: encryptToken(accessToken),
             tokenExpiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
             grantedScopes: parseGrantedScopes(shortLived.permissions),
           });
@@ -99,7 +108,7 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
             message: `@${user.username} 계정을 연결했습니다.`,
           });
           try {
-            await subscribeApps(longLived.access_token, user.igUserId);
+            await subscribeApps(accessToken, user.igUserId);
             const { setWebhookSubscribed } = await import("@/lib/hypeup/repo");
             await setWebhookSubscribed(user.id, new Date());
           } catch (subscribeError) {
@@ -127,6 +136,9 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
           }
           if (/role|tester|not authorized|permissions/i.test(message)) {
             return connectError(request, "not_tester", message, [clearState]);
+          }
+          if (isUnsupportedMethod(err)) {
+            return connectError(request, "token_exchange", undefined, [clearState]);
           }
           return connectError(request, "denied", message, [clearState]);
         }

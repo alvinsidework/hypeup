@@ -2,6 +2,10 @@ export function normalizeAuthCode(code: string): string {
   return code.replace(/#_$/, "");
 }
 
+export function isUnsupportedMethod(error: unknown): boolean {
+  return error instanceof Error && /unsupported request - method type/i.test(error.message);
+}
+
 export function isProfessionalAccount(accountType: string | undefined): boolean {
   if (!accountType) return true;
   const normalized = accountType.toUpperCase();

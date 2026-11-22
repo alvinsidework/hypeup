@@ -41,6 +41,8 @@ export const copy = {
   dmExpired: "댓글 후 7일이 지나 DM을 보낼 수 없습니다.",
   rateLimited: "Instagram 요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
   denied: "Instagram에서 권한 요청을 취소했거나, 앱이 요청한 권한을 받을 수 없습니다.",
+  tokenExchange:
+    "인스타그램이 이 계정의 토큰 발급을 거절했습니다. 앱 역할에서 인스타그램 테스터로 초대를 수락한 계정인지 확인해 주세요.",
   missingKeys: "APP_ENCRYPTION_KEY와 AUTH_SECRET을 .env.local에 64자리 hex로 채운 뒤 앱을 다시 시작하세요.",
   genericError: "요청을 처리하지 못했습니다. 잠시 후 다시 시도하세요.",
   nav: {
@@ -61,6 +63,7 @@ export const oauthErrorCopy: Record<string, string> = {
   redirect_mismatch: copy.redirectMismatch,
   not_configured: copy.notConfigured,
   denied: copy.denied,
+  token_exchange: copy.tokenExchange,
   missing_keys: copy.missingKeys,
   token_expired: copy.tokenExpired,
   state: "로그인 검증에 실패했습니다. 다시 연결하세요.",

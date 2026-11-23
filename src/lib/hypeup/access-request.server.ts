@@ -8,6 +8,7 @@ import {
 } from "./access-request-mail";
 import { appUrl, instagramAppId } from "./env.server";
 import { legal } from "./legal";
+import { LENS_LEGACY_ORIGIN } from "./public-origin";
 
 /** Same inbox as the public contact address. The +tag is a fresh FormSubmit form. */
 const ACCESS_REQUEST_INBOX = "alvinhan1707+hypeup@gmail.com";
@@ -94,7 +95,7 @@ export async function deliverAccessRequest(input: AccessRequestInput): Promise<A
     return { ok: false, error: "같은 이메일로 신청이 이미 접수되었습니다. 답변 메일을 기다려 주세요." };
   }
 
-  const site = applicantSiteUrl(appUrl(), legal.site);
+  const site = applicantSiteUrl(appUrl(), LENS_LEGACY_ORIGIN);
   const mail = composeAccessRequestEmail({
     instagram,
     email,

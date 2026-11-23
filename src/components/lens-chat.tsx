@@ -89,7 +89,8 @@ export function LensChat({
   const sendPending = useRef(false);
   const logRef = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
-  const latest = desk.messages.at(-1);
+  const latestId = desk.messages.at(-1)?.id;
+  const latestSender = desk.messages.at(-1)?.sender;
   const current = [...desk.deals]
     .reverse()
     .find((deal) => deal.status !== "cancelled" && deal.status !== "settled");
@@ -97,10 +98,10 @@ export function LensChat({
 
   useEffect(() => {
     const log = logRef.current;
-    if (log && (followLatest.current || latest?.sender === role)) {
+    if (log && (followLatest.current || latestSender === role)) {
       log.scrollTop = log.scrollHeight;
     }
-  }, [latest, role]);
+  }, [latestId, latestSender, role]);
 
   async function sendMessage() {
     const draft = body;
@@ -242,22 +243,12 @@ export function LensChat({
               협업 조건
             </h2>
             <div className="space-y-3">
-              {desk.deals.map((deal) => (
-                <DealCard
-                  key={deal.id}
-                  deal={deal}
-                  role={role}
-                  busy={busy}
-                  active={current?.id === deal.id}
-                  onAction={onAction}
-                />
-              ))}
               {canCreateProposal ? (
                 <details className="lens-panel group px-4 sm:px-5">
                   <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-xl text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
                     <span className="flex items-center gap-2.5">
                       <FileText className="size-5 text-muted" aria-hidden />{" "}
-                      조건 제안
+                      {desk.deals.length ? "새 조건 제안" : "조건 제안"}
                     </span>
                     <ChevronDown
                       className="size-4 text-muted transition-transform group-open:rotate-180"
@@ -274,6 +265,16 @@ export function LensChat({
                   />
                 </details>
               ) : null}
+              {desk.deals.map((deal) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  role={role}
+                  busy={busy}
+                  active={current?.id === deal.id}
+                  onAction={onAction}
+                />
+              ))}
             </div>
           </section>
         ) : null}
@@ -451,6 +452,13 @@ function DealCard({
       ) : null}
       {active && deal.status === "agreed" ? (
         <div className="mt-3 space-y-2">
+          {deal.cancelRequestedBy ? (
+            <p className="text-sm leading-relaxed text-muted">
+              {deal.cancelRequestedBy === role
+                ? "상대방이 취소에 동의하면 새 조건을 제안할 수 있어요."
+                : "상대방이 게시 전 취소를 요청했어요. 동의하면 새 조건을 제안할 수 있어요."}
+            </p>
+          ) : null}
           {deal.cancelRequestedBy && deal.cancelRequestedBy !== role ? (
             <button
               type="button"

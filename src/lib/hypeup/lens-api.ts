@@ -14,6 +14,7 @@ import {
   deleteRate,
   deleteWork,
   getBrandThread,
+  getBrandThreadById,
   getInfluencerThread,
   getPage,
   getPublicPage,
@@ -408,6 +409,22 @@ export const getLensThread = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireUser();
     return getInfluencerThread(user.id, data.id);
+  });
+
+export const refreshLensThread = createServerFn({ method: "POST" })
+  .validator(z.object({
+    id: z.string().uuid(),
+    role: z.enum(["influencer", "brand"]),
+    knownVersion: z.string().max(64),
+  }))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    if (data.role === "brand") {
+      const brand = await signedInBrand();
+      return brand ? getBrandThreadById(brand.id, data.id, data.knownVersion) : null;
+    }
+    const user = await signedIn();
+    return user ? getInfluencerThread(user.id, data.id, data.knownVersion) : null;
   });
 
 export const setLensArchive = createServerFn({ method: "POST" })

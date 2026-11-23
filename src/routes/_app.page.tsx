@@ -14,17 +14,15 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ProfilePhotoField } from "@/components/profile-photo-field";
 import { Field, ghostBtn, inputClass, primaryBtn } from "@/components/lens-ui";
-import { legal } from "@/lib/hypeup/legal";
 import { getLensDesk, saveLensPage } from "@/lib/hypeup/lens-api";
 import { CATEGORIES, validateUsername } from "@/lib/hypeup/lens-rules";
 import type { PageDraft } from "@/lib/hypeup/lens-repo";
+import { LENS_PUBLIC_HOST, publicProfileUrl } from "@/lib/hypeup/public-origin";
 
 export const Route = createFileRoute("/_app/page")({
   loader: () => getLensDesk(),
   component: PageEditor,
 });
-
-const publicHost = new URL(legal.site).host;
 
 function checkAddress(address: string, isPublic: boolean) {
   if (!address.trim())
@@ -89,7 +87,7 @@ function PageEditor() {
 
   async function copyPublicLink() {
     const username = data.page.username;
-    const url = new URL(`/${username}`, window.location.origin).href;
+    const url = publicProfileUrl(username);
     try {
       await navigator.clipboard.writeText(url);
       setShareLink(null);
@@ -287,7 +285,7 @@ function PageEditor() {
                   id="public-page-address-domain"
                   className="shrink-0 text-sm text-muted"
                 >
-                  {publicHost}/
+                  {LENS_PUBLIC_HOST}/
                 </span>
                 <input
                   ref={addressInput}
@@ -374,17 +372,16 @@ function PageEditor() {
               ) : null}
               {published ? (
                 <div className="mt-2 flex items-center gap-2 rounded-md bg-surface-2 px-2">
-                  <Link
-                    to="/$username"
-                    params={{ username: data.page.username }}
+                  <a
+                    href={publicProfileUrl(data.page.username)}
                     target="_blank"
                     rel="noreferrer"
                     aria-label="공개 페이지 열기"
                     className="flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-sm font-semibold transition-colors hover:text-accent-ink"
                   >
-                    <span className="truncate">/{data.page.username}</span>
+                    <span className="truncate">{LENS_PUBLIC_HOST}/{data.page.username}</span>
                     <ArrowUpRight className="size-4 shrink-0" aria-hidden />
-                  </Link>
+                  </a>
                   <button
                     type="button"
                     onClick={() => void copyPublicLink()}

@@ -7,13 +7,14 @@
 보이는 이름은 Lens다. 코드와 배포는 기존 Hypeup 하나다. 두 번째 제품을 만들지 않는다.
 
 - 저장소: `https://github.com/alvinsidework/hypeup.git`, 브랜치 `main`
-- 라이브: `https://hypeupinsta.vercel.app` (Vercel 프로젝트 `hypeupinsta`)
+- 공개 사이트·프로필 주소: `https://www.lens4u.here` (`https://lens4u.here`는 이 주소로 연결된다.)
+- Vercel 프로젝트 `hypeupinsta`의 기본 주소: `https://hypeupinsta.vercel.app`. Instagram 콜백과 기존 앱 연결은 이 주소를 사용한다.
 - `https://hypeup.vercel.app` 는 다른 Next.js 사이트다. 이 앱이 아니다.
 - 로컬 미리보기는 포트 8080, `npm run dev`
 - 회사 표기: 올인더밸류
 - 랜딩 제목 “인스타그램 댓글과 DM, 광고 관리까지 자동화하기” / 연결 제목 “내 인스타그램으로 대시보드 연결”
 - 내부 폴더 `src/lib/hypeup`, DB 테이블 `hypeup_*`, 타입 `HypeupUser` 는 이름을 바꾸지 않는다.
-- `/Volumes/PortableSSD/Dev/lens` 는 Capacitor 안드로이드 셸이다. 이 깃 저장소가 아니다. `appId` 는 `dev.lens.app`, `server.url` 은 위 라이브 주소. 셸 저장소는 사용자가 시키기 전에는 커밋하지 않는다.
+- `/Volumes/PortableSSD/Dev/lens` 는 Capacitor 안드로이드 셸이다. 이 깃 저장소가 아니다. `appId` 는 `dev.lens.app`, `server.url` 은 Vercel 기본 주소다. 셸 저장소는 사용자가 시키기 전에는 커밋하지 않는다.
 - 워크스페이스 `Agents.md` 의 `/workspace` 샌드박스 절차는 이 맥 작업에 적용하지 않는다.
 
 ## 배포

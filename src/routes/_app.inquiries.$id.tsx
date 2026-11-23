@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Archive, ArchiveRestore } from "lucide-react";
-import { toast } from "sonner";
 import { LensChat } from "@/components/lens-chat";
 import { PageHeader } from "@/components/page-header";
 import { ghostBtn } from "@/components/lens-ui";
+import { useLensThread } from "@/components/use-lens-thread";
 import {
   actOnLensDeal,
   getLensThread,
@@ -20,8 +19,6 @@ export const Route = createFileRoute("/_app/inquiries/$id")({
   component: ThreadPage,
 });
 
-type Update = { ok: true; desk: ThreadDesk } | { ok: false; error: string };
-
 function ThreadPage() {
   const initial = Route.useLoaderData();
   if (!initial) {
@@ -36,47 +33,21 @@ function ThreadPage() {
 
 function ThreadContent({ initial }: { initial: ThreadDesk }) {
   const router = useRouter();
-  const [desk, setDesk] = useState(initial);
-  const [busy, setBusy] = useState(false);
-
-  async function apply(request: () => Promise<Update>) {
-    if (busy) return false;
-    setBusy(true);
-    try {
-      const result = await request();
-      if (!result.ok) {
-        toast.error(result.error);
-        return false;
-      }
-      setDesk(result.desk);
-      return true;
-    } catch {
-      toast.error("요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { desk, busy, update } = useLensThread(initial, "influencer");
 
   async function changeArchive() {
-    setBusy(true);
-    try {
+    await update(async () => {
       const result = await setLensArchive({
         data: { id: desk.id, archived: !desk.archived },
       });
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
+      if (result.ok) {
+        await router.navigate({
+          to: "/inquiries",
+          search: { archived: desk.archived || undefined },
+        });
       }
-      await router.navigate({
-        to: "/inquiries",
-        search: { archived: desk.archived || undefined },
-      });
-    } catch {
-      toast.error("보관 상태를 변경하지 못했습니다.");
-    } finally {
-      setBusy(false);
-    }
+      return result;
+    }, "보관 상태를 변경하지 못했습니다.");
   }
 
   return (
@@ -105,14 +76,14 @@ function ThreadContent({ initial }: { initial: ThreadDesk }) {
         desk={desk}
         busy={busy}
         onSend={(body) =>
-          apply(() =>
+          update(() =>
             sendLensMessage({
               data: { role: "influencer", threadId: desk.id, body },
             }),
           )
         }
         onAction={async (action) => {
-          await apply(() =>
+          await update(() =>
             actOnLensDeal({
               data: { role: "influencer", threadId: desk.id, ...action },
             }),

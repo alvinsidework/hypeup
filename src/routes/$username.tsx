@@ -4,6 +4,7 @@ import { LogoMark, Wordmark } from "@/components/logo";
 import { getBrandFavorite } from "@/lib/hypeup/brand-api";
 import { getLensPublic } from "@/lib/hypeup/lens-api";
 import { validateUsername } from "@/lib/hypeup/lens-rules";
+import { publicProfileUrl } from "@/lib/hypeup/public-origin";
 
 export const Route = createFileRoute("/$username")({
   headers: () => ({ "Cache-Control": "private, no-store" }),
@@ -24,6 +25,9 @@ export const Route = createFileRoute("/$username")({
           : "Lens",
       },
     ],
+    links: loaderData?.ready
+      ? [{ rel: "canonical", href: publicProfileUrl(loaderData.page.username) }]
+      : [],
   }),
   component: PublicProfile,
 });

@@ -770,6 +770,7 @@ type ThreadMeta = {
   email: string;
   trust: string;
   archived: boolean;
+  messageVersion: string;
   influencerName: string;
   username: string;
 };
@@ -785,12 +786,14 @@ async function threadMeta(threadId: string): Promise<ThreadMeta | null> {
     email: string;
     trust: string;
     archived: boolean;
+    message_version: string;
     display_name: string | null;
     username: string | null;
     ig_name: string | null;
     ig_username: string;
   }>(
-    `select t.id, t.user_id, t.brand_id, t.archived, coalesce(nullif(t.company_name, ''), b.company) as company, b.contact_name, b.email, b.trust,
+    `select t.id, t.user_id, t.brand_id, t.archived, t.last_message_at::text as message_version,
+      coalesce(nullif(t.company_name, ''), b.company) as company, b.contact_name, b.email, b.trust,
       case when p.is_public then p.display_name end as display_name,
       case when p.is_public then p.username end as username,
       u.name as ig_name, u.username as ig_username
@@ -812,6 +815,7 @@ async function threadMeta(threadId: string): Promise<ThreadMeta | null> {
     email: row.email,
     trust: row.trust,
     archived: row.archived,
+    messageVersion: row.message_version,
     influencerName: row.display_name || row.ig_name || row.ig_username,
     username: row.username || "",
   };
@@ -930,6 +934,7 @@ export type ThreadDesk = {
   trustLabel: string;
   emailMasked: string;
   archived: boolean;
+  messageVersion: string;
   influencerName: string;
   username: string;
   messages: LensMessage[];
@@ -945,6 +950,7 @@ async function deskFor(meta: ThreadMeta, rates: RateTemplate[]): Promise<ThreadD
     trustLabel: trustLabel(meta.trust),
     emailMasked: maskEmail(meta.email),
     archived: meta.archived,
+    messageVersion: meta.messageVersion,
     influencerName: meta.influencerName,
     username: meta.username,
     messages: await loadMessages(meta.id),
@@ -953,11 +959,15 @@ async function deskFor(meta: ThreadMeta, rates: RateTemplate[]): Promise<ThreadD
   };
 }
 
-export async function getInfluencerThread(userId: string, threadId: string): Promise<ThreadDesk | null> {
+export async function getInfluencerThread(
+  userId: string,
+  threadId: string,
+  knownVersion?: string,
+): Promise<ThreadDesk | null> {
   const meta = await threadMeta(threadId);
-  if (!meta || meta.userId !== userId) return null;
+  if (!meta || meta.userId !== userId || meta.messageVersion === knownVersion) return null;
   const sql = await getSql();
-  await sql.query("update hypeup_thread set unread_count = 0 where id = $1", [threadId]);
+  await sql.query("update hypeup_thread set unread_count = 0 where id = $1 and unread_count > 0", [threadId]);
   return deskFor(meta, await listRates(userId));
 }
 
@@ -973,9 +983,13 @@ export async function getBrandThread(username: string, brandId: string): Promise
   return rows[0] ? getBrandThreadById(brandId, rows[0].id) : null;
 }
 
-export async function getBrandThreadById(brandId: string, threadId: string): Promise<ThreadDesk | null> {
+export async function getBrandThreadById(
+  brandId: string,
+  threadId: string,
+  knownVersion?: string,
+): Promise<ThreadDesk | null> {
   const meta = await threadMeta(threadId);
-  if (!meta || meta.brandId !== brandId) return null;
+  if (!meta || meta.brandId !== brandId || meta.messageVersion === knownVersion) return null;
   const rates = (await listRates(meta.userId)).filter((rate) => rate.isPublic && !rate.priceHidden);
   return deskFor(meta, rates);
 }
@@ -1223,24 +1237,31 @@ export async function applyDealAction(input: {
       note: input.note || "",
     });
     if (!noted.ok) return noted;
-  } else if (input.action === "cancel") {
+  } else if (input.action === "cancel" || input.action === "confirm_cancel") {
+    const confirming = input.action === "confirm_cancel";
+    const otherParty = input.actor.role === "brand" ? "influencer" : "brand";
+    const requester = confirming ? otherParty : input.actor.role;
+    const sentence = confirming ? systemSentences.cancelled() : `${actorName}님이 게시 전 취소를 요청했습니다.`;
     const rows = await sql.query(
-      `update hypeup_deal set cancel_requested_by = $2 where id = $1 and status = 'agreed' and cancel_requested_by is null returning id`,
-      [deal.id, input.actor.role],
+      `with changed_deal as (
+         update hypeup_deal
+         set ${confirming ? "status = 'cancelled'" : "cancel_requested_by = $3"}
+         where id = $1 and thread_id = $2 and status = 'agreed'
+           and ${confirming ? "cancel_requested_by = $3" : "cancel_requested_by is null"}
+         returning id, thread_id
+       ), recorded_message as (
+         insert into hypeup_message (id, thread_id, sender, body, kind, payload)
+         select $4, thread_id, 'system', $5, 'system', jsonb_build_object('dealId', id)
+         from changed_deal returning thread_id
+       )
+       update hypeup_thread t
+       set last_message_at = clock_timestamp(), unread_count = unread_count + 1
+       from recorded_message m where t.id = m.thread_id returning t.id`,
+      [deal.id, meta.id, requester, newId(), sentence],
     );
-    if (!rows.length) return { ok: false, error: "취소를 요청하지 못했습니다." };
-    const noted = await addMessage(meta.id, "system", `${actorName}님이 게시 전 취소를 요청했습니다.`, "system", {
-      dealId: deal.id,
-    });
-    if (!noted.ok) return noted;
-  } else if (input.action === "confirm_cancel") {
-    const rows = await sql.query(
-      "update hypeup_deal set status = 'cancelled' where id = $1 and status = 'agreed' returning id",
-      [deal.id],
-    );
-    if (!rows.length) return { ok: false, error: "취소하지 못했습니다." };
-    const noted = await addMessage(meta.id, "system", systemSentences.cancelled(), "system", { dealId: deal.id });
-    if (!noted.ok) return noted;
+    if (!rows.length) {
+      return { ok: false, error: confirming ? "취소하지 못했습니다." : "취소를 요청하지 못했습니다." };
+    }
   }
   return finish(meta, input.actor.role);
 }

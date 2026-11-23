@@ -15,6 +15,7 @@ import { LogTable } from "@/components/log-table";
 import { getBootstrap } from "@/lib/hypeup/bootstrap";
 import { copy } from "@/lib/hypeup/copy";
 import { formatCount, initial, relativeTime } from "@/lib/hypeup/format";
+import { LENS_PUBLIC_ORIGIN } from "@/lib/hypeup/public-origin";
 
 const SHORTCUTS = [
   { to: "/inbox", label: "댓글 인박스", icon: Inbox },
@@ -24,6 +25,7 @@ const SHORTCUTS = [
 ] as const;
 
 export const Route = createFileRoute("/")({
+  head: () => ({ links: [{ rel: "canonical", href: `${LENS_PUBLIC_ORIGIN}/` }] }),
   loader: async () => {
     const boot = await getBootstrap();
     if (!boot.user) return { boot, home: null };

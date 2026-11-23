@@ -1,3 +1,5 @@
+import { LENS_PUBLIC_ORIGIN } from "./public-origin";
+
 export const legal = {
   appName: "Lens",
   company: "올인더밸류",
@@ -7,6 +9,6 @@ export const legal = {
   email: "alvinhan1707@gmail.com",
   phoneDisplay: "070-8983-6814",
   phoneHref: "tel:+827089836814",
-  site: "https://hypeupinsta.vercel.app",
+  site: LENS_PUBLIC_ORIGIN,
   industry: "정보통신업 / 음악 및 기타 오디오물 출판업",
 } as const;

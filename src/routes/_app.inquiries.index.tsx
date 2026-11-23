@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { getLensInquiries } from "@/lib/hypeup/lens-api";
 import { initial, relativeTime } from "@/lib/hypeup/format";
 import { statusLabel } from "@/lib/hypeup/lens-rules";
+import { LENS_PUBLIC_ORIGIN } from "@/lib/hypeup/public-origin";
 
 export const Route = createFileRoute("/_app/inquiries/")({
   validateSearch: (
@@ -32,7 +33,7 @@ function InquiryList() {
   async function copyPublicLink() {
     try {
       await navigator.clipboard.writeText(
-        new URL(data.publicPath, window.location.origin).href,
+        new URL(data.publicPath, LENS_PUBLIC_ORIGIN).href,
       );
       toast.success("링크를 복사했습니다.");
     } catch {

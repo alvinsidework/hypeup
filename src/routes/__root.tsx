@@ -5,6 +5,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
+import { InstagramBrowserAuthProvider } from "@/components/instagram-browser-auth";
 import { NativeAuthBridge } from "@/components/native-auth-bridge";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PwaInstallProvider } from "@/components/pwa-install";
@@ -70,7 +71,9 @@ export const Route = createRootRoute({
           <PwaInstallProvider>
             <PwaServiceWorker />
             <TaskProgressProvider>
-              <Outlet />
+              <InstagramBrowserAuthProvider>
+                <Outlet />
+              </InstagramBrowserAuthProvider>
             </TaskProgressProvider>
           </PwaInstallProvider>
         </AuthProvider>

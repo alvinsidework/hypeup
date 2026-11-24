@@ -10,6 +10,7 @@ import {
   createOAuthState,
   OAUTH_STATE_TTL_SECONDS,
 } from "@/lib/hypeup/oauth-state.server";
+import { startPwaOAuth } from "@/lib/hypeup/oauth-pwa.server";
 import { authorizeUrl } from "@/lib/instagram/oauth";
 
 function redirectHeaders(location: string): Headers {
@@ -40,7 +41,7 @@ export const Route = createFileRoute("/api/auth/instagram")({
             ? "app"
             : "web";
         try {
-          const { state, proof } = await createOAuthState(client);
+          const { state, proof } = await createOAuthState({ client });
           const location = authorizeUrl({
             appId,
             redirectUri: oauthRedirectUri(request),
@@ -65,6 +66,7 @@ export const Route = createFileRoute("/api/auth/instagram")({
           });
         }
       },
+      POST: ({ request }) => startPwaOAuth(request),
     },
   },
 });

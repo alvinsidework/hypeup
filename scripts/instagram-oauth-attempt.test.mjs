@@ -12,6 +12,8 @@ test("Instagram callback claims and recovers an attempt across concurrent reques
     POSTGRES_PRISMA_URL: null,
     INSTAGRAM_APP_ID: "test-instagram-app",
     INSTAGRAM_APP_SECRET: "test-instagram-secret",
+    INSTAGRAM_REDIRECT_URI:
+      "https://hypeupinsta.vercel.app/api/auth/instagram/callback",
     AUTH_SECRET: "test-only-session-secret",
     APP_ENCRYPTION_KEY: "ab".repeat(32),
   })) {
@@ -290,6 +292,131 @@ test("Instagram callback claims and recovers an attempt across concurrent reques
           providerCalls.filter((path) => path === "/oauth/access_token").length,
           3,
         );
+      },
+    );
+    await t.test(
+      "PWA receives its session independently of the Instagram browser",
+      async (t) => {
+        const canonical = "https://www.lens4u.here";
+        const legacy = "https://hypeupinsta.vercel.app";
+        const path = "/api/auth/instagram";
+        const handoffPath = `${path}/handoff`;
+        const { Route: start } = await server.ssrLoadModule(
+          `/src/routes${path}.ts`,
+        );
+        const { Route: callback } = await server.ssrLoadModule(
+          `/src/routes${path}.callback.ts`,
+        );
+        const { Route: handoff } = await server.ssrLoadModule(
+          `/src/routes${path}.handoff.ts`,
+        );
+        const postJson = (route, url, body, cookie = "") =>
+          route.options.server.handlers.POST({
+            request: new Request(url, {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                origin: canonical,
+                cookie,
+              },
+              body: JSON.stringify(body),
+            }),
+          });
+        const cookieValue = (response) =>
+          response.headers.getSetCookie()[0].split(";", 1)[0];
+
+        const prepared = await postJson(start, canonical + path, {});
+        const ticket = await prepared.json();
+        assert.equal(ticket.status, "ready");
+        assert.equal(ticket.launchUrl, legacy + path);
+        assert.equal(ticket.expiresIn, 600);
+        const claimCookie = cookieValue(prepared);
+        assert.ok(
+          claimCookie.startsWith(`hypeup_oauth_pwa_claim_${ticket.attemptId}=`),
+        );
+        assert.notEqual(claimCookie.split("=")[1], ticket.launchToken);
+        const poll = (cookie) =>
+          postJson(
+            handoff,
+            canonical + handoffPath,
+            { attemptId: ticket.attemptId },
+            cookie,
+          );
+        assert.deepEqual(await (await poll(claimCookie)).json(), {
+          status: "pending",
+        });
+
+        const launch = (origin) =>
+          start.options.server.handlers.POST({
+            request: new Request(ticket.launchUrl, {
+              method: "POST",
+              headers: { origin, "sec-fetch-mode": "navigate" },
+              body: new URLSearchParams({ launchToken: ticket.launchToken }),
+            }),
+          });
+        assert.equal((await launch(legacy)).headers.get("location"), null);
+        const launched = await launch(canonical);
+        assert.equal(launched.status, 303);
+        assert.equal((await launch(canonical)).headers.get("location"), null);
+        const popupCookie = cookieValue(launched);
+        assert.match(popupCookie, /^hypeup_oauth_pwa_state=/);
+        const authorize = new URL(launched.headers.get("location"));
+        const redirect = new URL(authorize.searchParams.get("redirect_uri"));
+        redirect.search = new URLSearchParams({
+          state: authorize.searchParams.get("state"),
+          code: "pwa-test-code",
+        });
+        const finish = (cookie) =>
+          callback.options.server.handlers.GET({
+            request: new Request(redirect, { headers: { cookie } }),
+          });
+        let exchanges = 0;
+        t.mock.method(globalThis, "fetch", async (input) => {
+          const url = new URL(input);
+          if (url.hostname === "api.instagram.com") {
+            exchanges++;
+            return Response.json({
+              access_token: "short-test",
+              user_id: "pwa-test-account",
+            });
+          }
+          assert.equal(url.hostname, "graph.instagram.com");
+          if (url.pathname === "/access_token")
+            return Response.json({ access_token: "long-test" });
+          if (url.pathname.endsWith("/me"))
+            return Response.json({
+              user_id: "pwa-test-account",
+              username: "pwa-test-creator",
+              account_type: "BUSINESS",
+            });
+          assert.ok(url.pathname.endsWith("/subscribed_apps"));
+          return Response.json({ success: true });
+        });
+        assert.equal((await finish(claimCookie)).headers.get("location"), null);
+        assert.equal(exchanges, 0);
+        const result = await finish(popupCookie);
+        assert.equal(
+          result.headers.get("location"),
+          `${canonical}${handoffPath}?view=complete`,
+        );
+        assert.match(
+          result.headers.getSetCookie()[0],
+          /^hypeup_oauth_pwa_state=;.*Max-Age=0/,
+        );
+        assert.equal(result.headers.getSetCookie().length, 1);
+        assert.equal(exchanges, 1);
+        assert.equal((await poll()).status, 403);
+        assert.equal((await poll(popupCookie)).status, 403);
+        for (let retry = 0; retry < 2; retry++) {
+          const claimed = await poll(claimCookie);
+          assert.deepEqual(await claimed.json(), { status: "complete" });
+          const [clearClaim, session] = claimed.headers.getSetCookie();
+          assert.match(clearClaim, /; Max-Age=0/);
+          assert.match(session, /^hypeup_session=.+; Path=\/; HttpOnly/);
+          const recovered = await poll(session.split(";", 1)[0]);
+          assert.deepEqual(await recovered.json(), { status: "complete" });
+          assert.equal(recovered.headers.getSetCookie().length, 0);
+        }
       },
     );
   } finally {

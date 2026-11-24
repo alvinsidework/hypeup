@@ -12,12 +12,19 @@ import {
   claimOAuthAttempt,
   completeOAuthAttempt,
   failOAuthAttempt,
+  finishPwaOAuthAttempt,
   readOAuthAttempt,
 } from "@/lib/hypeup/oauth-attempt.server";
 import {
+  PWA_OAUTH_STATE_COOKIE,
+  PWA_OAUTH_STATE_PREFIX,
   verifyOAuthState,
   type OAuthClient,
 } from "@/lib/hypeup/oauth-state.server";
+import {
+  pwaOAuthView,
+  redirectPwaOAuthView,
+} from "@/lib/hypeup/oauth-pwa.server";
 import { addLog, setWebhookSubscribed, upsertUser } from "@/lib/hypeup/repo";
 import { appBridgeResponse, signAppHandoff } from "@/lib/hypeup/app-handoff";
 import {
@@ -25,6 +32,7 @@ import {
   readCookieHeader,
   signSession,
   verifySessionToken,
+  type SessionPayload,
 } from "@/lib/hypeup/session.server";
 import {
   exchangeLongLivedToken,
@@ -53,13 +61,27 @@ function redirectTo(target: URL, cookies: string[] = []) {
   return new Response(null, { status: 302, headers });
 }
 
-function connectError(
+async function connectError(
   request: Request,
   client: OAuthClient,
   error: string,
   cookies: string[] = [],
 ) {
-  if (client === "app") return appBridgeResponse(request, { error }, cookies);
+  if (client.client === "pwa") {
+    if (error !== "oauth_pending") {
+      await finishPwaOAuthAttempt(client.attempt, null, error).catch(() => {
+        console.error("[hypeup] PWA OAuth failure could not be recorded");
+      });
+    }
+    return redirectPwaOAuthView(
+      request,
+      client.attempt.origin,
+      "failed",
+      cookies,
+    );
+  }
+  if (client.client === "app")
+    return appBridgeResponse(request, { error }, cookies);
   const target = new URL("/connect", request.url);
   target.searchParams.set("error", error);
   return redirectTo(target, cookies);
@@ -68,10 +90,24 @@ function connectError(
 async function connected(
   request: Request,
   client: OAuthClient,
-  session: string,
+  connectedUser: SessionPayload,
   clearState: string,
 ) {
-  if (client === "app") {
+  if (client.client === "pwa") {
+    const finished = await finishPwaOAuthAttempt(
+      client.attempt,
+      connectedUser.userId,
+      null,
+    );
+    return redirectPwaOAuthView(
+      request,
+      client.attempt.origin,
+      finished ? "complete" : "failed",
+      [clearState],
+    );
+  }
+  const session = await signSession(connectedUser);
+  if (client.client === "app") {
     return appBridgeResponse(
       request,
       { handoff: await signAppHandoff(session) },
@@ -173,11 +209,13 @@ async function finishAccountConnection(
       tokenExpiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
       grantedScopes: parseGrantedScopes(shortLived.permissions),
     });
-    const session = await signSession({
-      userId: user.id,
-      igUserId: user.igUserId,
-    });
     await completeOAuthAttempt(proof, user.id);
+    const response = await connected(
+      request,
+      client,
+      { userId: user.id, igUserId: user.igUserId },
+      clearState,
+    );
 
     // The connection is usable even when activity logging or webhook setup fails.
     try {
@@ -204,7 +242,7 @@ async function finishAccountConnection(
       });
     }
 
-    return connected(request, client, session, clearState);
+    return response;
   } catch (error) {
     const failure = oauthFailureCode(error, stage);
     console.error("[hypeup] Instagram OAuth failed", stage, failure);
@@ -222,19 +260,26 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
         const url = new URL(request.url);
         const appId = instagramAppId();
         const appSecret = instagramAppSecret();
-        const proof = readCookieHeader(request, OAUTH_STATE_COOKIE);
-        const previousClient =
-          readCookieHeader(request, OAUTH_CLIENT_COOKIE) === "app"
-            ? "app"
-            : "web";
-        if (!appId || !appSecret)
-          return connectError(request, previousClient, "not_configured");
-
         const state = url.searchParams.get("state");
+        const isPwa = state?.startsWith(PWA_OAUTH_STATE_PREFIX) ?? false;
+        const stateCookie = isPwa ? PWA_OAUTH_STATE_COOKIE : OAUTH_STATE_COOKIE;
+        const proof = readCookieHeader(request, stateCookie);
+        const previousClient: OAuthClient = {
+          client:
+            readCookieHeader(request, OAUTH_CLIENT_COOKIE) === "app"
+              ? "app"
+              : "web",
+        };
+        if (!appId || !appSecret)
+          return isPwa
+            ? pwaOAuthView("failed")
+            : connectError(request, previousClient, "not_configured");
+
         const code = url.searchParams.get("code");
         const resume = url.searchParams.get("resume");
         const client = await verifyOAuthState(proof, state);
         if (!proof || !state || !client) {
+          if (isPwa) return pwaOAuthView("failed");
           // A completed web navigation may be restored after its state cookie was cleared.
           const session = readCookieHeader(request, SESSION_COOKIE);
           if (
@@ -250,7 +295,7 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
         }
 
         const resumeCount = resume === "1" ? 1 : resume === "2" ? 2 : 0;
-        const clearState = cookieHeader(OAUTH_STATE_COOKIE, "", request, 0);
+        const clearState = cookieHeader(stateCookie, "", request, 0);
         if (url.searchParams.has("error") || (!code && !resumeCount)) {
           const providerError = new Error(
             ["error_description", "error_reason", "error"]
@@ -258,6 +303,16 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
               .join(" "),
           );
           const failure = oauthFailureCode(providerError, "authorization");
+          if (client.client === "pwa") {
+            try {
+              if (!(await claimOAuthAttempt(proof))) {
+                return connectError(request, client, "oauth_pending");
+              }
+              await failOAuthAttempt(proof, failure);
+            } catch {
+              return connectError(request, client, "oauth_retry", [clearState]);
+            }
+          }
           return connectError(request, client, failure, [clearState]);
         }
 
@@ -276,11 +331,15 @@ export const Route = createFileRoute("/api/auth/instagram/callback")({
 
           const attempt = await waitForOAuthAttempt(proof);
           if (attempt?.status === "complete") {
-            const session = await signSession({
-              userId: attempt.userId,
-              igUserId: attempt.igUserId,
-            });
-            return connected(request, client, session, clearState);
+            return connected(
+              request,
+              client,
+              {
+                userId: attempt.userId,
+                igUserId: attempt.igUserId,
+              },
+              clearState,
+            );
           }
           if (attempt?.status === "pending") {
             if (resumeCount === MAX_CALLBACK_RESUMES) {

@@ -2,13 +2,18 @@ import { SignJWT, jwtVerify } from "jose";
 import { randomNonce } from "./crypto.server";
 import { sessionSecretKey } from "./session.server";
 
-export type OAuthClient = "web" | "app";
+export type OAuthClient =
+  | { client: "web" | "app" }
+  | { client: "pwa"; attempt: { id: string; origin: string } };
 
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60;
+export const PWA_OAUTH_STATE_COOKIE = "hypeup_oauth_pwa_state";
+export const PWA_OAUTH_STATE_PREFIX = "pwa_";
 
 export async function createOAuthState(client: OAuthClient) {
-  const state = randomNonce();
-  const proof = await new SignJWT({ kind: "instagram-oauth", state, client })
+  const state =
+    (client.client === "pwa" ? PWA_OAUTH_STATE_PREFIX : "") + randomNonce();
+  const proof = await new SignJWT({ kind: "instagram-oauth", state, ...client })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${OAUTH_STATE_TTL_SECONDS}s`)
@@ -27,9 +32,20 @@ export async function verifyOAuthState(
     });
     if (payload.kind !== "instagram-oauth" || payload.state !== state)
       return null;
-    return payload.client === "web" || payload.client === "app"
-      ? payload.client
-      : null;
+    if (payload.client === "web" || payload.client === "app")
+      return { client: payload.client };
+    if (payload.client === "pwa" && state.startsWith(PWA_OAUTH_STATE_PREFIX)) {
+      const attempt = payload.attempt as {
+        id?: unknown;
+        origin?: unknown;
+      } | null;
+      if (typeof attempt?.id === "string" && typeof attempt.origin === "string")
+        return {
+          client: "pwa",
+          attempt: { id: attempt.id, origin: attempt.origin },
+        };
+    }
+    return null;
   } catch {
     return null;
   }

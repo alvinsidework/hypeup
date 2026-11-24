@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { ProfileLayoutEditor } from "@/components/profile-layout-editor";
 import { ProfilePhotoField } from "@/components/profile-photo-field";
 import { Field, ghostBtn, inputClass, primaryBtn } from "@/components/lens-ui";
 import { getLensDesk, saveLensPage } from "@/lib/hypeup/lens-api";
@@ -48,6 +49,12 @@ function PageEditor() {
     url: string;
   } | null>(null);
   const dirty = edited || profilePhoto !== undefined;
+  const draftPhoto =
+    profilePhoto === undefined
+      ? data.avatarUrl
+      : profilePhoto === null
+        ? data.instagramAvatarUrl
+        : `data:image/jpeg;base64,${profilePhoto}`;
   const savedAddressNeedsChange =
     Boolean(data.page.username) && !validateUsername(data.page.username).ok;
   const editingSavedConflict =
@@ -110,7 +117,7 @@ function PageEditor() {
             target={dirty || preparingPhoto ? "_blank" : undefined}
             rel="noreferrer"
           >
-            <Eye className="size-4" aria-hidden /> 공개 미리보기
+            <Eye className="size-4" aria-hidden /> 저장된 화면 보기
           </Link>
         }
       />
@@ -147,6 +154,7 @@ function PageEditor() {
             const result = await saveLensPage({
               data: {
                 username: form.username,
+                layout: form.layout,
                 displayName: form.displayName,
                 bio: form.bio,
                 categories: form.categories,
@@ -185,6 +193,12 @@ function PageEditor() {
       >
         <fieldset className="min-w-0" disabled={busy} aria-busy={busy}>
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <ProfileLayoutEditor
+              draft={form}
+              photo={draftPhoto}
+              preparingPhoto={preparingPhoto}
+              onChange={(layout) => patch({ layout })}
+            />
             <section className="lens-panel px-4 py-5 sm:p-6">
               <h2 className="text-lg font-semibold tracking-tight">
                 프로필 편집

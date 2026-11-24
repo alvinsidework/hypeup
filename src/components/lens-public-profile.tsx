@@ -20,15 +20,23 @@ import type { PublicPage } from "@/lib/hypeup/lens-repo";
 type PublicWork = PublicPage["works"][number];
 type PublicStat = PublicWork["stats"][number];
 
+type ProfileProps = {
+  page: PublicPage;
+  preview?: boolean;
+  favorite?: { saved: boolean } | null;
+};
+
 export function LensPublicProfile({
   page,
   preview = false,
   favorite,
-}: {
-  page: PublicPage;
-  preview?: boolean;
-  favorite?: { saved: boolean } | null;
-}) {
+}: ProfileProps) {
+  if (page.layout === "magazine") {
+    return (
+      <MagazineProfile page={page} preview={preview} favorite={favorite} />
+    );
+  }
+
   return (
     <article className="mx-auto w-full max-w-4xl">
       <header className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-5 border-b border-border pb-6 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-x-8 sm:gap-y-4 sm:pb-8">
@@ -106,94 +114,193 @@ export function LensPublicProfile({
           ) : null}
         </div>
 
-        <div className="col-span-2 flex flex-wrap items-center gap-2.5 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:max-w-56 sm:justify-end">
-          {preview ? (
-            <button
-              type="button"
-              className="lens-button lens-button-primary w-full sm:w-auto"
-              disabled
+        <ProfileActions
+          className="col-span-2 flex flex-wrap items-center gap-2.5 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:max-w-56 sm:justify-end"
+          page={page}
+          preview={preview}
+          favorite={favorite}
+        />
+      </header>
+
+      <PortfolioGallery works={page.works} />
+    </article>
+  );
+}
+
+function MagazineProfile({ page, preview, favorite }: ProfileProps) {
+  const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
+  const photo = page.avatarUrl;
+
+  return (
+    <article className="@container mx-auto w-full max-w-6xl">
+      <header>
+        <div className="flex flex-col items-start gap-2.5 border-y border-border py-3 @min-[42rem]:min-h-16 @min-[42rem]:flex-row @min-[42rem]:flex-wrap @min-[42rem]:items-center @min-[42rem]:justify-between @min-[42rem]:py-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="min-w-0 text-sm font-semibold text-muted [overflow-wrap:anywhere]">
+              @{page.username}
+            </span>
+            {page.categories.length ? (
+              <ul aria-label="분야" className="flex min-w-0 flex-wrap gap-1.5">
+                {page.categories.map((category) => (
+                  <li
+                    key={category}
+                    className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-fg"
+                  >
+                    #{category}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          {page.channels.length ? (
+            <ul
+              aria-label="소셜 채널"
+              className="flex min-w-0 flex-wrap gap-x-4 gap-y-0.5"
             >
-              <Mail className="size-4" aria-hidden />
-              브랜드 문의하기
-            </button>
-          ) : (
-            <Link
-              to="/$username/inquiry"
-              params={{ username: page.username }}
-              className="lens-button lens-button-primary w-full sm:w-auto"
-            >
-              <Mail className="size-4" aria-hidden />
-              브랜드 문의하기
-            </Link>
-          )}
-          {favorite && !preview ? (
-            <FavoriteButton username={page.username} saved={favorite.saved} />
+              {page.channels.map((channel) => (
+                <li key={channel.key} className="min-w-0">
+                  <a
+                    href={socialUrl(channel.key, channel.handle)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 max-w-full flex-wrap items-center gap-x-1.5 rounded-sm text-[13px] leading-snug text-muted transition-colors hover:text-accent-ink"
+                  >
+                    {channel.label}
+                    {channel.followers != null ? (
+                      <span className="font-semibold text-fg tabular-nums">
+                        {formatCount(channel.followers)}
+                        <span className="sr-only"> 팔로워</span>
+                      </span>
+                    ) : null}
+                    <ArrowUpRight className="size-3.5 shrink-0" aria-hidden />
+                  </a>
+                </li>
+              ))}
+            </ul>
           ) : null}
-          {page.links.map((link, index) => (
-            <a
-              key={`${link.url}-${index}`}
-              className="lens-button lens-button-secondary min-w-0 max-w-full"
-              href={link.url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span className="[overflow-wrap:anywhere]">{link.label}</span>
-              <ArrowUpRight className="size-4 shrink-0" aria-hidden />
-            </a>
-          ))}
+        </div>
+        <div className="mx-auto max-w-4xl px-1 pt-9 pb-8 text-center @min-[42rem]:px-8 @min-[42rem]:pt-15 @min-[42rem]:pb-11">
+          <h1 className="font-display text-[clamp(2.5rem,8.4cqw,6.5rem)] leading-[0.98] font-extrabold tracking-[-0.062em] [overflow-wrap:anywhere] text-balance">
+            {page.displayName}
+          </h1>
+          {page.bio ? (
+            <p className="mx-auto mt-5 max-w-[36rem] text-[clamp(1rem,2.4cqw,1.3125rem)] leading-relaxed font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-pretty text-muted [word-break:keep-all] @min-[42rem]:mt-6">
+              {page.bio}
+            </p>
+          ) : null}
+          <ProfileActions
+            className="mt-6 flex flex-wrap items-center justify-center gap-2.5 @min-[42rem]:mt-7"
+            page={page}
+            preview={preview}
+            favorite={favorite}
+          />
         </div>
       </header>
 
-      {page.works.length ? (
-        <section className="mt-7 sm:mt-8" aria-labelledby="profile-portfolio">
-          <h2
-            id="profile-portfolio"
-            className="mb-3.5 text-xl font-semibold tracking-tight sm:mb-5"
-          >
-            포트폴리오
-          </h2>
-          <ul className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6">
-            {page.works.map((work) => (
-              <li key={work.id} className="min-w-0">
-                <WorkPreview work={work} />
-              </li>
-            ))}
-          </ul>
-        </section>
+      {photo && failedPhoto !== photo ? (
+        <figure className="relative mx-auto aspect-[4/5] w-full max-w-[52rem] overflow-hidden bg-surface-2 @min-[42rem]:aspect-[5/4]">
+          <img
+            src={photo}
+            alt={`${page.displayName} 대표 이미지`}
+            className="absolute inset-0 size-full object-cover object-[center_38%]"
+            fetchPriority="high"
+            decoding="async"
+            onError={() => setFailedPhoto(photo)}
+          />
+        </figure>
       ) : null}
 
-      {page.rates.length ? (
-        <section className="mt-9 sm:mt-11" aria-labelledby="profile-rates">
-          <h2
-            id="profile-rates"
-            className="mb-3.5 text-xl font-semibold tracking-tight"
-          >
-            단가
-          </h2>
-          <ul className="lens-panel divide-y divide-border px-4 sm:px-6">
-            {page.rates.map((rate) => (
-              <li
-                key={rate.id}
-                className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 py-4"
-              >
-                <div className="min-w-0">
-                  <p className="text-base font-semibold [overflow-wrap:anywhere]">
-                    {rate.title}
-                  </p>
-                  <p className="mt-1 text-sm text-muted">
-                    {rate.formatLabel} · 수정 {rate.revisions}회 ·{" "}
-                    {rate.usageLabel}
-                  </p>
-                </div>
-                <p className="text-base font-semibold tabular-nums [overflow-wrap:anywhere]">
-                  {rate.priceLabel}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <PortfolioGallery works={page.works} magazine />
     </article>
+  );
+}
+
+function ProfileActions({
+  page,
+  preview,
+  favorite,
+  className,
+}: ProfileProps & { className: string }) {
+  return (
+    <div className={className}>
+      {preview ? (
+        <button
+          type="button"
+          className="lens-button lens-button-primary w-full sm:w-auto"
+          disabled
+        >
+          <Mail className="size-4" aria-hidden />
+          브랜드 문의하기
+        </button>
+      ) : (
+        <Link
+          to="/$username/inquiry"
+          params={{ username: page.username }}
+          className="lens-button lens-button-primary w-full sm:w-auto"
+        >
+          <Mail className="size-4" aria-hidden />
+          브랜드 문의하기
+        </Link>
+      )}
+      {favorite && !preview ? (
+        <FavoriteButton username={page.username} saved={favorite.saved} />
+      ) : null}
+      {page.links.map((link, index) => (
+        <a
+          key={`${link.url}-${index}`}
+          className="lens-button lens-button-secondary min-w-0 max-w-full"
+          href={link.url}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className="[overflow-wrap:anywhere]">{link.label}</span>
+          <ArrowUpRight className="size-4 shrink-0" aria-hidden />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function PortfolioGallery({
+  works,
+  magazine = false,
+}: {
+  works: PublicWork[];
+  magazine?: boolean;
+}) {
+  if (!works.length) return null;
+  return (
+    <section
+      aria-label="포트폴리오"
+      className={
+        magazine
+          ? "mt-12 border-t border-fg/20 pt-4 @min-[42rem]:mt-20 @min-[42rem]:pt-6"
+          : "mt-7 sm:mt-8"
+      }
+    >
+      <h2
+        className={
+          magazine
+            ? "mb-4 text-2xl font-bold tracking-[-0.04em] @min-[42rem]:mb-6 @min-[42rem]:text-[2rem]"
+            : "mb-3.5 text-xl font-semibold tracking-tight sm:mb-5"
+        }
+      >
+        포트폴리오
+      </h2>
+      <ul
+        className={
+          magazine
+            ? "grid grid-cols-2 gap-x-3 gap-y-7 @min-[42rem]:grid-cols-3 @min-[42rem]:gap-x-5 @min-[42rem]:gap-y-10"
+            : "grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6"
+        }
+      >
+        {works.map((work) => (
+          <li key={work.id} className="min-w-0">
+            <WorkPreview work={work} magazine={magazine} />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -250,7 +357,13 @@ function FavoriteButton({
   );
 }
 
-function WorkPreview({ work }: { work: PublicWork }) {
+function WorkPreview({
+  work,
+  magazine,
+}: {
+  work: PublicWork;
+  magazine: boolean;
+}) {
   const mediaType = work.mediaType ?? "IMAGE";
   const Icon =
     mediaType === "REELS" || mediaType === "VIDEO"
@@ -284,7 +397,11 @@ function WorkPreview({ work }: { work: PublicWork }) {
           <span className="relative block">
             <MediaPreview
               media={media}
-              className="rounded-lg ring-1 ring-border ring-inset"
+              className={
+                magazine
+                  ? "rounded-[2px]"
+                  : "rounded-lg ring-1 ring-border ring-inset"
+              }
             />
             {Icon ? (
               <span

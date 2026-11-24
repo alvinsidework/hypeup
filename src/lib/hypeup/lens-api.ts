@@ -50,6 +50,7 @@ import {
   type TermsInput,
 } from "./lens-rules";
 import { PORTFOLIO_METRICS } from "./portfolio-metrics";
+import { DEFAULT_PROFILE_LAYOUT, PROFILE_LAYOUTS } from "./profile-layout";
 import { PROFILE_PHOTO_BASE64_LENGTH } from "./profile-photo";
 import { isProfileJpeg } from "./profile-photo.server";
 import { getMedia, listMedia, type UserRecord } from "./repo";
@@ -86,6 +87,7 @@ function followers(value: number | null): number | null {
 function blankPage(name: string, handle: string, count: number | null): PageDraft {
   return {
     username: "",
+    layout: DEFAULT_PROFILE_LAYOUT,
     displayName: name,
     bio: "",
     categories: [],
@@ -154,6 +156,7 @@ export const saveLensPage = createServerFn({ method: "POST" })
   .validator(
     z.object({
       username: z.string().max(24),
+      layout: z.enum(PROFILE_LAYOUTS).nullish(),
       displayName: z.string().max(40),
       bio: z.string().max(80),
       categories: z.array(z.string()).max(3),
@@ -195,6 +198,7 @@ export const saveLensPage = createServerFn({ method: "POST" })
     if (data.isPublic && !username) return { ok: false as const, error: "공개하려면 주소가 필요합니다." };
     return savePage(user.id, {
       username,
+      layout: data.layout,
       displayName,
       bio: data.bio.trim(),
       categories,

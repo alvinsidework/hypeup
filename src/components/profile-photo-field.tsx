@@ -10,33 +10,28 @@ import {
 const JPEG_PREFIX = "data:image/jpeg;base64,";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 
-async function squarePhoto(file: File) {
+async function preparePhoto(file: File) {
   const source = URL.createObjectURL(file);
   try {
     const photo = new window.Image();
     photo.src = source;
     await photo.decode();
-    const side = Math.min(photo.naturalWidth, photo.naturalHeight);
-    const size = Math.min(side, PROFILE_PHOTO_DIMENSION);
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context || !size) throw new Error("Invalid photo");
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, size, size);
-    context.drawImage(
-      photo,
-      (photo.naturalWidth - side) / 2,
-      (photo.naturalHeight - side) / 2,
-      side,
-      side,
-      0,
-      0,
-      size,
-      size,
+    if (!photo.naturalWidth || !photo.naturalHeight)
+      throw new Error("Invalid photo");
+    const scale = Math.min(
+      1,
+      PROFILE_PHOTO_DIMENSION /
+        Math.max(photo.naturalWidth, photo.naturalHeight),
     );
-    for (const quality of [0.88, 0.72, 0.55]) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(photo.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(photo.naturalHeight * scale));
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Invalid photo");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(photo, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.9, 0.78, 0.65, 0.5]) {
       const data = canvas.toDataURL("image/jpeg", quality);
       if (!data.startsWith(JPEG_PREFIX)) break;
       const base64 = data.slice(JPEG_PREFIX.length);
@@ -90,7 +85,7 @@ export function ProfilePhotoField({
     }
     onPreparing(true);
     try {
-      onChange(await squarePhoto(file));
+      onChange(await preparePhoto(file));
     } catch {
       setError("사진을 열 수 없어요. JPG, PNG 또는 WebP 파일을 선택해 주세요.");
     } finally {

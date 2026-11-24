@@ -51,9 +51,15 @@ function ProfileUnavailable({ title }: { title: string }) {
 function PublicProfile() {
   const data = Route.useLoaderData();
   if (!data.ready) return <ProfileUnavailable title="페이지를 준비 중이에요" />;
+  const magazine = data.page.layout === "magazine";
+  const width = magazine ? "max-w-[76rem]" : "max-w-[60rem]";
   return (
-    <div className="min-h-dvh pt-[env(safe-area-inset-top)]">
-      <header className="lens-secondary-brand mx-auto flex max-w-[60rem] items-center px-4 pt-3 sm:px-8">
+    <div
+      className={`min-h-dvh pt-[env(safe-area-inset-top)] ${magazine ? "bg-surface" : ""}`}
+    >
+      <header
+        className={`lens-secondary-brand mx-auto flex items-center px-4 pt-3 sm:px-8 ${width}`}
+      >
         <Link
           to="/"
           aria-label="Lens 홈"
@@ -63,7 +69,9 @@ function PublicProfile() {
           <Wordmark />
         </Link>
       </header>
-      <main className="lens-reveal mx-auto w-full max-w-[60rem] px-4 pt-8 pb-[calc(40px+env(safe-area-inset-bottom))] sm:px-8 sm:pt-12">
+      <main
+        className={`lens-reveal mx-auto w-full px-4 pt-8 pb-[calc(40px+env(safe-area-inset-bottom))] sm:px-8 sm:pt-12 ${width}`}
+      >
         <LensPublicProfile
           key={data.page.username}
           page={data.page}

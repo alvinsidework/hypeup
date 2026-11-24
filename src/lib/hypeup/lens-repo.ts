@@ -2,6 +2,7 @@ import { getSql } from "@/lib/db";
 import { unpackBrandContract } from "./brand-repo.server";
 import { encryptToken, newId } from "./crypto.server";
 import { PORTFOLIO_METRICS, PORTFOLIO_METRIC_LABEL, type PortfolioMetric } from "./portfolio-metrics";
+import { DEFAULT_PROFILE_LAYOUT, type ProfileLayout } from "./profile-layout";
 import {
   CHANNEL_LABEL,
   FORMAT_LABEL,
@@ -21,7 +22,6 @@ import {
   systemSentences,
   transitionError,
   trustLabel,
-  usageLabel,
   priceLabel,
   type DealActionType,
   type WorkChannel,
@@ -59,6 +59,7 @@ function isUnique(error: unknown): boolean {
 export type PageLink = { label: string; url: string };
 export type PageDraft = {
   username: string;
+  layout: ProfileLayout;
   displayName: string;
   bio: string;
   categories: string[];
@@ -78,20 +79,12 @@ export type PageDraft = {
 
 export type PublicPage = {
   username: string;
+  layout: ProfileLayout;
   displayName: string;
   bio: string;
   categories: string[];
   avatarUrl: string | null;
   channels: { key: string; label: string; handle: string; followers: number | null }[];
-  rates: {
-    id: string;
-    title: string;
-    formatLabel: string;
-    priceLabel: string;
-    revisions: number;
-    usageLabel: string;
-    description: string;
-  }[];
   works: {
     id: string;
     title: string;
@@ -112,6 +105,7 @@ export type PublicPage = {
 type PageRow = {
   user_id: string;
   username: string | null;
+  profile_layout: ProfileLayout | null;
   display_name: string;
   bio: string;
   categories: string[] | null;
@@ -142,6 +136,7 @@ function linksOf(value: unknown): PageLink[] {
 function mapPage(row: PageRow): PageDraft {
   return {
     username: row.username ?? "",
+    layout: row.profile_layout ?? DEFAULT_PROFILE_LAYOUT,
     displayName: row.display_name ?? "",
     bio: row.bio ?? "",
     categories: textArray(row.categories),
@@ -162,7 +157,7 @@ function mapPage(row: PageRow): PageDraft {
 
 const PAGE_COLUMNS = `user_id, username, display_name, bio, categories, instagram_handle, instagram_followers,
   tiktok_handle, tiktok_followers, youtube_handle, youtube_followers, links, is_public, notify_email,
-  bank_name, account_last4, account_holder, profile_photo_key`;
+  bank_name, account_last4, account_holder, profile_photo_key, profile_layout`;
 
 export async function getPage(userId: string): Promise<PageDraft | null> {
   const sql = await getSql();
@@ -172,7 +167,8 @@ export async function getPage(userId: string): Promise<PageDraft | null> {
 
 export async function savePage(
   userId: string,
-  page: Omit<PageDraft, "payoutLabel" | "notifyEmail" | "hasCustomPhoto" | "customPhotoUrl"> & {
+  page: Omit<PageDraft, "payoutLabel" | "notifyEmail" | "hasCustomPhoto" | "customPhotoUrl" | "layout"> & {
+    layout?: ProfileLayout | null;
     profilePhoto?: string | null;
   },
 ): Promise<Ok<{ page: PageDraft }> | Err> {
@@ -183,8 +179,8 @@ export async function savePage(
       `insert into hypeup_page (
         user_id, username, display_name, bio, categories, instagram_handle, instagram_followers,
         tiktok_handle, tiktok_followers, youtube_handle, youtube_followers, links, is_public,
-        profile_photo, profile_photo_key, updated_at
-      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,decode($14, 'base64'),$15,now())
+        profile_photo, profile_photo_key, profile_layout, updated_at
+      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,decode($14, 'base64'),$15,coalesce($17, $18),now())
       on conflict (user_id) do update set
         username = excluded.username,
         display_name = excluded.display_name,
@@ -200,6 +196,7 @@ export async function savePage(
         is_public = excluded.is_public,
         profile_photo = case when $16 then excluded.profile_photo else hypeup_page.profile_photo end,
         profile_photo_key = case when $16 then excluded.profile_photo_key else hypeup_page.profile_photo_key end,
+        profile_layout = coalesce($17, hypeup_page.profile_layout),
         updated_at = now()`,
       [
         userId,
@@ -218,6 +215,8 @@ export async function savePage(
         page.profilePhoto ?? null,
         page.profilePhoto ? newId() : null,
         page.profilePhoto !== undefined,
+        page.layout ?? null,
+        DEFAULT_PROFILE_LAYOUT,
       ],
     );
   } catch (error) {
@@ -317,14 +316,15 @@ function mapRate(row: RateRow): RateTemplate {
   };
 }
 
-export async function listRates(userId: string): Promise<RateTemplate[]> {
+export async function listRates(userId: string, brandVisibleOnly = false): Promise<RateTemplate[]> {
   const sql = await getSql();
   const rows = await sql.query<RateRow>(
     `select id, sort_order, format, title, model, amount_krw, rate_bps, price_hidden, deliverable_count,
       description, revisions, turnaround_days, usage_days, paid_ads, raw_files, exclusivity_days,
       exclusivity_category, is_public
-     from hypeup_rate where user_id = $1 order by sort_order asc, created_at asc`,
-    [userId],
+     from hypeup_rate where user_id = $1 and (not $2::boolean or (is_public and not price_hidden))
+     order by sort_order asc, created_at asc`,
+    [userId, brandVisibleOnly],
   );
   return rows.map(mapRate);
 }
@@ -641,7 +641,7 @@ export async function getPublicPage(username: string): Promise<PublicPage | null
   >(
     `select p.user_id, p.username, p.display_name, p.bio, p.categories, p.instagram_handle, p.instagram_followers,
       p.tiktok_handle, p.tiktok_followers, p.youtube_handle, p.youtube_followers, p.links, p.is_public,
-      p.notify_email, p.bank_name, p.account_last4, p.account_holder, p.profile_photo_key, u.profile_picture_url
+      p.notify_email, p.bank_name, p.account_last4, p.account_holder, p.profile_photo_key, p.profile_layout, u.profile_picture_url
      from hypeup_page p
      join hypeup_user u on u.id = p.user_id
      where p.username = $1 and p.is_public = true`,
@@ -658,18 +658,10 @@ export async function buildPublicPage(
   username: string,
   instagramAvatarUrl: string | null,
 ): Promise<PublicPage> {
-  const sql = await getSql();
-  const [rates, works] = await Promise.all([
-    sql.query<RateRow>(
-      `select id, sort_order, format, title, model, amount_krw, rate_bps, price_hidden, deliverable_count, description,
-        revisions, turnaround_days, usage_days, paid_ads, raw_files, exclusivity_days, exclusivity_category, is_public
-       from hypeup_rate where user_id = $1 and is_public = true order by sort_order asc, created_at asc`,
-      [userId],
-    ),
-    listWorkRows(userId, true),
-  ]);
+  const works = await listWorkRows(userId, true);
   return {
     username,
+    layout: page.layout,
     displayName: page.displayName || username,
     bio: page.bio,
     categories: page.categories.slice(0, 3),
@@ -679,20 +671,6 @@ export async function buildPublicPage(
       ...channel("tiktok", "틱톡", page.tiktokHandle, page.tiktokFollowers),
       ...channel("youtube", "유튜브", page.youtubeHandle, page.youtubeFollowers),
     ],
-    rates: rates.map((rate) => ({
-      id: rate.id,
-      title: rate.title,
-      formatLabel: FORMAT_LABEL[rate.format as DealFormat] ?? rate.format,
-      priceLabel: priceLabel({
-        model: rate.model as DealModel,
-        amountKrw: rate.price_hidden ? null : rate.amount_krw,
-        rateBps: rate.price_hidden ? null : rate.rate_bps,
-        priceHidden: rate.price_hidden,
-      }),
-      revisions: rate.revisions,
-      usageLabel: usageLabel(rate.usage_days),
-      description: rate.description,
-    })),
     works: works.map((work) => ({
       id: work.id,
       title: work.title,
@@ -939,10 +917,35 @@ export type ThreadDesk = {
   username: string;
   messages: LensMessage[];
   deals: LensDeal[];
+  rateCardState: "locked" | "visible";
   rates: RateTemplate[];
 };
 
-async function deskFor(meta: ThreadMeta, rates: RateTemplate[]): Promise<ThreadDesk> {
+async function loadDeskRates(meta: ThreadMeta, role: Party): Promise<Pick<ThreadDesk, "rateCardState" | "rates">> {
+  if (role === "influencer") return { rateCardState: "visible", rates: await listRates(meta.userId) };
+  const sql = await getSql();
+  const [result] = await sql.query<{ unlocked: boolean }>(
+    `select exists (
+       select 1 from hypeup_message reply
+       where reply.thread_id = $1 and reply.sender = 'influencer' and reply.kind = 'text'
+         and reply.body ~ '[^[:space:]]' and reply.created_at > (
+           select min(first_contact.created_at) from hypeup_message first_contact
+           where first_contact.thread_id = $1 and first_contact.sender = 'brand' and first_contact.kind = 'text'
+             and first_contact.body ~ '[^[:space:]]'
+         )
+     ) as unlocked`,
+    [meta.id],
+  );
+  if (!result?.unlocked) return { rateCardState: "locked", rates: [] };
+  return { rateCardState: "visible", rates: await listRates(meta.userId, true) };
+}
+
+async function deskFor(meta: ThreadMeta, role: Party): Promise<ThreadDesk> {
+  const [messages, deals, rateCard] = await Promise.all([
+    loadMessages(meta.id),
+    loadDeals(meta.id),
+    loadDeskRates(meta, role),
+  ]);
   return {
     id: meta.id,
     company: meta.company,
@@ -953,9 +956,9 @@ async function deskFor(meta: ThreadMeta, rates: RateTemplate[]): Promise<ThreadD
     messageVersion: meta.messageVersion,
     influencerName: meta.influencerName,
     username: meta.username,
-    messages: await loadMessages(meta.id),
-    deals: await loadDeals(meta.id),
-    rates,
+    messages,
+    deals,
+    ...rateCard,
   };
 }
 
@@ -968,7 +971,7 @@ export async function getInfluencerThread(
   if (!meta || meta.userId !== userId || meta.messageVersion === knownVersion) return null;
   const sql = await getSql();
   await sql.query("update hypeup_thread set unread_count = 0 where id = $1 and unread_count > 0", [threadId]);
-  return deskFor(meta, await listRates(userId));
+  return deskFor(meta, "influencer");
 }
 
 export async function getBrandThread(username: string, brandId: string): Promise<ThreadDesk | null> {
@@ -990,8 +993,7 @@ export async function getBrandThreadById(
 ): Promise<ThreadDesk | null> {
   const meta = await threadMeta(threadId);
   if (!meta || meta.brandId !== brandId || meta.messageVersion === knownVersion) return null;
-  const rates = (await listRates(meta.userId)).filter((rate) => rate.isPublic && !rate.priceHidden);
-  return deskFor(meta, rates);
+  return deskFor(meta, "brand");
 }
 
 export async function archiveThread(userId: string, threadId: string, archived: boolean): Promise<Err | { ok: true }> {
@@ -1046,11 +1048,7 @@ export async function sendText(input: {
   if (!sender) return { ok: false, error: "이 대화에 글을 남길 수 없습니다." };
   const saved = await addMessage(meta.id, sender, input.body.trim(), "text", null);
   if (!saved.ok) return saved;
-  const rates =
-    sender === "influencer"
-      ? await listRates(meta.userId)
-      : (await listRates(meta.userId)).filter((rate) => rate.isPublic && !rate.priceHidden);
-  return { ok: true, desk: await deskFor(meta, rates) };
+  return finish(meta, sender);
 }
 
 export async function openInquiry(input: {
@@ -1267,11 +1265,7 @@ export async function applyDealAction(input: {
 }
 
 async function finish(meta: ThreadMeta, role: Party): Promise<Ok<{ desk: ThreadDesk }>> {
-  const rates =
-    role === "influencer"
-      ? await listRates(meta.userId)
-      : (await listRates(meta.userId)).filter((rate) => rate.isPublic && !rate.priceHidden);
-  return { ok: true, desk: await deskFor(meta, rates) };
+  return { ok: true, desk: await deskFor(meta, role) };
 }
 
 export async function recordSource(access: { userId?: string; brandId?: string }, dealId: string): Promise<

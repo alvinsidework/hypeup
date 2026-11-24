@@ -5,7 +5,9 @@ import {
   ChevronDown,
   FileText,
   LoaderCircle,
+  LockKeyhole,
   MessageCircle,
+  ReceiptText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LensConfirm } from "@/components/lens-confirm";
@@ -237,49 +239,125 @@ export function LensChat({
           </form>
         </section>
 
-        {desk.deals.length || canCreateProposal ? (
-          <section className="min-w-0">
-            <h2 className="mb-3 text-lg font-semibold tracking-tight">
-              협업 조건
-            </h2>
-            <div className="space-y-3">
-              {canCreateProposal ? (
-                <details className="lens-panel group px-4 sm:px-5">
-                  <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-xl text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
-                    <span className="flex items-center gap-2.5">
-                      <FileText className="size-5 text-muted" aria-hidden />{" "}
-                      {desk.deals.length ? "새 조건 제안" : "조건 제안"}
-                    </span>
-                    <ChevronDown
-                      className="size-4 text-muted transition-transform group-open:rotate-180"
-                      aria-hidden
+        <div className="min-w-0 space-y-5">
+          {role === "brand" ? <ConversationRates desk={desk} /> : null}
+          {desk.deals.length || canCreateProposal ? (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold tracking-tight">
+                협업 조건
+              </h2>
+              <div className="space-y-3">
+                {canCreateProposal ? (
+                  <details className="lens-panel group px-4 sm:px-5">
+                    <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-xl text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
+                      <span className="flex items-center gap-2.5">
+                        <FileText className="size-5 text-muted" aria-hidden />{" "}
+                        {desk.deals.length ? "새 조건 제안" : "조건 제안"}
+                      </span>
+                      <ChevronDown
+                        className="size-4 text-muted transition-transform group-open:rotate-180"
+                        aria-hidden
+                      />
+                    </summary>
+                    <ProposeForm
+                      rates={desk.rates}
+                      role={role}
+                      busy={busy}
+                      onAction={onAction}
+                      templates={proposalTemplates}
+                      onSaveTemplate={onSaveProposalTemplate}
                     />
-                  </summary>
-                  <ProposeForm
-                    rates={desk.rates}
+                  </details>
+                ) : null}
+                {desk.deals.map((deal) => (
+                  <DealCard
+                    key={deal.id}
+                    deal={deal}
                     role={role}
                     busy={busy}
+                    active={current?.id === deal.id}
                     onAction={onAction}
-                    templates={proposalTemplates}
-                    onSaveTemplate={onSaveProposalTemplate}
                   />
-                </details>
-              ) : null}
-              {desk.deals.map((deal) => (
-                <DealCard
-                  key={deal.id}
-                  deal={deal}
-                  role={role}
-                  busy={busy}
-                  active={current?.id === deal.id}
-                  onAction={onAction}
-                />
-              ))}
-            </div>
-          </section>
-        ) : null}
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
       </div>
     </div>
+  );
+}
+
+function ConversationRates({ desk }: { desk: ThreadDesk }) {
+  const locked = desk.rateCardState === "locked";
+  const hasSentMessage = desk.messages.some(
+    (message) =>
+      message.sender === "brand" &&
+      message.kind === "text" &&
+      message.body.trim(),
+  );
+  const Icon = locked ? LockKeyhole : ReceiptText;
+
+  return (
+    <section className="lens-panel p-4 sm:p-5" aria-label="크리에이터 단가표">
+      <div className="flex items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted">
+          <Icon className="size-[18px]" strokeWidth={1.75} aria-hidden />
+        </span>
+        <h2 className="text-base font-semibold tracking-tight">
+          크리에이터 단가표
+        </h2>
+      </div>
+      <div aria-live="polite">
+        {locked ? (
+          <>
+            <div
+              className="mt-3 flex items-center justify-between gap-4 rounded-lg bg-surface-2 px-4 py-3"
+              aria-hidden="true"
+            >
+              <div className="space-y-2 blur-[3px]">
+                <div className="h-2.5 w-24 rounded-full bg-muted/35" />
+                <div className="h-2 w-16 rounded-full bg-muted/20" />
+              </div>
+              <div className="h-3 w-16 rounded-full bg-muted/35 blur-[3px]" />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted [word-break:keep-all]">
+              {hasSentMessage
+                ? "크리에이터가 첫 답장을 보내면 단가를 볼 수 있어요."
+                : "첫 메시지를 보내세요. 크리에이터가 답장하면 단가를 볼 수 있어요."}
+            </p>
+          </>
+        ) : desk.rates.length ? (
+          <>
+            <p className="sr-only">단가표가 열렸어요.</p>
+            <ul className="mt-2 divide-y divide-border">
+              {desk.rates.map((rate) => (
+                <li
+                  key={rate.id}
+                  className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-3 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold [overflow-wrap:anywhere]">
+                      {rate.title}
+                    </p>
+                    <p className="mt-1 text-sm text-muted">
+                      {FORMAT_LABEL[rate.format]} · {MODEL_LABEL[rate.model]}
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold tabular-nums">
+                    {priceLabel(rate)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-muted">
+            공유된 단가가 없어요.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 

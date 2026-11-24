@@ -143,7 +143,7 @@ function RatesPage() {
     <div className="max-w-5xl">
       <PageHeader
         title="단가"
-        description="공개 페이지에 표시할 협업 단가를 관리합니다. 이미 확정된 조건에는 영향을 주지 않습니다."
+        description="이메일 인증을 마친 브랜드가 먼저 메시지를 보내고 내가 첫 답장을 하면, 금액 공유가 설정된 항목이 해당 대화에 표시됩니다."
         action={
           <button
             type="button"
@@ -183,15 +183,18 @@ function RatesPage() {
                 <p className="mt-0.5 text-sm text-muted">
                   {FORMAT_LABEL[rate.format]} · 수정 {rate.revisions}회 ·{" "}
                   {usageLabel(rate.usageDays)}
-                  {rate.isPublic ? "" : " · 비공개"}
+                  {rate.isPublic && !rate.priceHidden
+                    ? " · 답장 후 공유"
+                    : " · 나만 보기"}
                 </p>
                 <p className="mt-1 text-sm font-semibold tabular-nums">
-                  {priceLabel({
-                    model: rate.model,
-                    amountKrw: rate.amountKrw,
-                    rateBps: rate.rateBps,
-                    priceHidden: rate.priceHidden,
-                  })}
+                  {rate.priceHidden
+                    ? "금액 숨김"
+                    : priceLabel({
+                        model: rate.model,
+                        amountKrw: rate.amountKrw,
+                        rateBps: rate.rateBps,
+                      })}
                 </p>
               </button>
               <div className="flex shrink-0 gap-1">
@@ -269,7 +272,7 @@ function RatesPage() {
             {draft.id ? (
               <LensConfirm
                 title="이 단가를 삭제할까요?"
-                description="관리 목록과 공개 페이지에서 삭제됩니다."
+                description="저장한 협업 단가 목록에서 삭제됩니다."
                 confirmLabel="삭제"
                 onConfirm={() => {
                   if (draft.id) void remove(draft.id);
@@ -443,6 +446,15 @@ function RatesPage() {
               </Field>
             </div>
           ) : null}
+          <label className="mt-3 flex min-h-11 items-center gap-3 border-t border-border pt-3 text-sm">
+            <input
+              className="size-5 shrink-0 accent-accent"
+              type="checkbox"
+              checked={draft.isPublic}
+              onChange={(event) => patch({ isPublic: event.target.checked })}
+            />
+            첫 답장 후 브랜드 대화에 공유
+          </label>
           <label className="flex min-h-11 items-center gap-3 text-sm">
             <input
               className="size-5 shrink-0 accent-accent"
@@ -450,16 +462,7 @@ function RatesPage() {
               checked={draft.priceHidden}
               onChange={(event) => patch({ priceHidden: event.target.checked })}
             />
-            금액 비공개. 페이지에는 문의로 표시
-          </label>
-          <label className="flex min-h-11 items-center gap-3 text-sm">
-            <input
-              className="size-5 shrink-0 accent-accent"
-              type="checkbox"
-              checked={draft.isPublic}
-              onChange={(event) => patch({ isPublic: event.target.checked })}
-            />
-            페이지에 공개
+            금액 숨기기 (이 항목은 나만 보기)
           </label>
           <div className="mt-4 flex flex-wrap gap-2">
             <button className={primaryBtn} type="submit" disabled={busy}>

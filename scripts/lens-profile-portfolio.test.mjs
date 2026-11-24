@@ -39,12 +39,16 @@ test("profile photos and linked Instagram metrics follow saved publication choic
     const {
       getProfilePhoto,
       buildPublicPage,
+      getPage,
       getPublicPage,
       savePage,
       saveWork,
     } = await server.ssrLoadModule("/src/lib/hypeup/lens-repo.ts");
     const { isProfileJpeg } = await server.ssrLoadModule(
       "/src/lib/hypeup/profile-photo.server.ts",
+    );
+    const { PROFILE_PHOTO_DIMENSION } = await server.ssrLoadModule(
+      "/src/lib/hypeup/profile-photo.ts",
     );
     const { encryptToken } = await server.ssrLoadModule(
       "/src/lib/hypeup/crypto.server.ts",
@@ -55,17 +59,19 @@ test("profile photos and linked Instagram metrics follow saved publication choic
 
     assert.equal(isProfileJpeg(jpeg), true);
     assert.equal(isProfileJpeg("data:image/jpeg;base64," + jpeg), false);
-    const oversized = Buffer.from(jpeg, "base64");
-    oversized.writeUInt16BE(
-      513,
-      oversized.indexOf(Buffer.from([0xff, 0xc0])) + 5,
-    );
-    assert.equal(isProfileJpeg(oversized.toString("base64")), false);
+    const photo = Buffer.from(jpeg, "base64");
+    const frameHeight = photo.indexOf(Buffer.from([0xff, 0xc0])) + 5;
+    photo.writeUInt16BE(PROFILE_PHOTO_DIMENSION, frameHeight);
+    assert.equal(isProfileJpeg(photo.toString("base64")), true);
+    photo.writeUInt16BE(PROFILE_PHOTO_DIMENSION + 1, frameHeight);
+    assert.equal(isProfileJpeg(photo.toString("base64")), false);
 
     const sql = await getSql();
     await sql`insert into hypeup_user (id, ig_user_id, username, token_cipher) values
       ('owner', 'ig-owner', 'studio.hana', ${encryptToken("test-token")}),
       ('other', 'ig-other', 'another', null)`;
+    await sql`insert into hypeup_page (user_id) values ('other')`;
+    assert.equal((await getPage("other")).layout, "magazine");
     const owner = await findUserById("owner");
     t.mock.method(globalThis, "fetch", async (url) => {
       const request = new URL(url);
@@ -111,6 +117,7 @@ test("profile photos and linked Instagram metrics follow saved publication choic
     };
     const draft = await savePage("owner", { ...profile, profilePhoto: jpeg });
     assert.equal(draft.ok, true);
+    assert.equal(draft.page.layout, "magazine");
     const key = new URL(
       draft.page.customPhotoUrl,
       "http://localhost",
@@ -147,6 +154,7 @@ test("profile photos and linked Instagram metrics follow saved publication choic
       profile.username,
       null,
     );
+    assert.equal(preview.layout, "magazine");
     assert.equal(preview.channels[0].followers, null);
     assert.equal(preview.works[0].coverUrl, "https://example.com/photo.jpg");
     assert.equal(preview.works[0].highlightLabel, null);
@@ -156,15 +164,45 @@ test("profile photos and linked Instagram metrics follow saved publication choic
     ]);
     assert.equal(JSON.stringify(preview.works[0]).includes("312"), false);
 
-    await savePage("owner", { ...profile, isPublic: true });
+    const published = await savePage("owner", {
+      ...profile,
+      isPublic: true,
+      layout: "magazine",
+    });
+    assert.equal(published.ok, true);
+    assert.equal(published.page.layout, "magazine");
+    assert.equal((await getPublicPage(profile.username)).layout, "magazine");
+    assert.equal(
+      (await buildPublicPage("owner", published.page, profile.username, null))
+        .layout,
+      "magazine",
+    );
     assert.equal(
       (await getPublicPage(profile.username)).avatarUrl,
       draft.page.customPhotoUrl,
     );
     assert.ok(await getProfilePhoto(key, null));
-    await savePage("owner", { ...profile, isPublic: true, profilePhoto: null });
+    await savePage("owner", { ...profile, isPublic: true });
+    assert.equal((await getPublicPage(profile.username)).layout, "magazine");
+    await savePage("owner", {
+      ...profile,
+      isPublic: true,
+      layout: null,
+      profilePhoto: null,
+    });
+    assert.equal((await getPublicPage(profile.username)).layout, "magazine");
     assert.equal((await getPublicPage(profile.username)).avatarUrl, null);
     assert.equal(await getProfilePhoto(key, null), null);
+    assert.equal(
+      (await savePage("owner", { ...profile, isPublic: true, layout: "sns" }))
+        .page.layout,
+      "sns",
+    );
+    assert.equal((await getPublicPage(profile.username)).layout, "sns");
+    await assert.rejects(
+      sql`update hypeup_page set profile_layout = 'other' where user_id = 'owner'`,
+      { code: "23514" },
+    );
   } finally {
     await Promise.all([server.close(), pglite?.close()]);
   }

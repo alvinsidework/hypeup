@@ -137,20 +137,6 @@ function MagazineProfile({ page, preview, favorite }: ProfileProps) {
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   const photo = page.avatarUrl === failedPhoto ? null : page.avatarUrl;
   const hasExtraActions = Boolean((favorite && !preview) || page.links.length);
-  const introduction = (
-    <>
-      <h1 className="font-display text-[clamp(1.875rem,6.7cqw,4.25rem)] leading-[1.03] font-bold tracking-[-0.052em] [overflow-wrap:anywhere]">
-        {page.displayName}
-      </h1>
-      {page.bio ? (
-        <p
-          className={`mt-2.5 max-w-xl text-[clamp(0.9375rem,1.9cqw,1.125rem)] leading-relaxed font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-pretty [word-break:keep-all] @min-[42rem]:mt-3 ${photo ? "" : "text-muted"}`}
-        >
-          {page.bio}
-        </p>
-      ) : null}
-    </>
-  );
 
   return (
     <article className="@container mx-auto w-full max-w-6xl">
@@ -219,8 +205,18 @@ function MagazineProfile({ page, preview, favorite }: ProfileProps) {
             />
           </div>
         ) : null}
+        <div className="mx-auto max-w-3xl px-1 pt-8 pb-7 text-center @min-[42rem]:px-6 @min-[42rem]:py-12">
+          <h1 className="font-display text-2xl leading-[1.15] font-bold tracking-[-0.035em] [overflow-wrap:anywhere] text-balance @min-[42rem]:text-4xl">
+            {page.displayName}
+          </h1>
+          {page.bio ? (
+            <p className="mx-auto mt-4 max-w-[42rem] text-[15px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] text-pretty text-muted [word-break:keep-all] @min-[42rem]:mt-5 @min-[42rem]:text-base">
+              {page.bio}
+            </p>
+          ) : null}
+        </div>
         {photo ? (
-          <figure className="relative isolate mx-auto mt-5 grid w-full max-w-[52rem] grid-cols-[minmax(0,1fr)] overflow-hidden bg-surface-2 before:col-start-1 before:row-start-1 before:aspect-[4/5] before:w-full before:self-start @min-[42rem]:mt-8 @min-[42rem]:before:aspect-[5/4]">
+          <figure className="relative mx-auto aspect-[4/5] w-full max-w-[52rem] overflow-hidden bg-surface-2 @min-[42rem]:aspect-[5/4]">
             <img
               src={photo}
               alt={`${page.displayName} 대표 이미지`}
@@ -229,21 +225,8 @@ function MagazineProfile({ page, preview, favorite }: ProfileProps) {
               decoding="async"
               onError={() => setFailedPhoto(photo)}
             />
-            <figcaption
-              className="relative col-start-1 row-start-1 self-end px-5 pt-[var(--caption-fade)] pb-6 text-left text-white [--caption-fade:clamp(3rem,8cqw,6rem)] [text-shadow:0_2px_12px_rgba(0,0,0,0.55)] @min-[42rem]:px-10 @min-[42rem]:pb-10"
-              style={{
-                backgroundImage:
-                  "linear-gradient(to top, rgb(0 0 0 / 84%), rgb(0 0 0 / 62%) calc(100% - var(--caption-fade)), transparent)",
-              }}
-            >
-              {introduction}
-            </figcaption>
           </figure>
-        ) : (
-          <div className="mx-auto w-full max-w-[52rem] pt-7 text-left @min-[42rem]:pt-12">
-            {introduction}
-          </div>
-        )}
+        ) : null}
       </header>
 
       <PortfolioGallery works={page.works} magazine />

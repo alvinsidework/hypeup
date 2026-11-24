@@ -110,10 +110,11 @@ function LayoutThumbnail({ layout }: { layout: ProfileLayout }) {
           <span className="h-1 w-1/4 rounded-full bg-current/50" />
           <span className="h-2 w-6 rounded-full bg-accent" />
         </span>
-        <span className="flex flex-1 flex-col justify-end gap-1 bg-surface-2 p-2">
+        <span className="flex shrink-0 flex-col items-center gap-1 pt-0.5">
           <span className="h-1.5 w-[55%] bg-current/80" />
           <span className="h-1 w-[38%] rounded-full bg-current/45" />
         </span>
+        <span className="min-h-0 flex-1 bg-surface-2" />
       </span>
     );
   }
